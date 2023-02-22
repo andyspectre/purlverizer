@@ -47,6 +47,23 @@ def get_folders(filename):
             folders.sort()
         return folders
 
+def split_path(urls):
+    folders = []
+    for url in urls:
+        words = urlparse(url).path.split("/")
+        for word in words:
+            if word not in folders and word != "" and "." not in word:
+                folders.append(word)
+    folders.sort()
+    return folders
+
+def read_file(filename):
+    list_of_urls = []
+    with open(filename, encoding="utf 8") as f:
+        for line in f:
+            url = line.strip()
+            list_of_urls.append(url)
+    return list_of_urls
 
 def start_cli_parser():
     parser = argparse.ArgumentParser(
@@ -68,10 +85,20 @@ def wordstree():
     files = []
     parser = start_cli_parser()
     args = vars(parser.parse_args())
-    if args["folders"]:
-        folders = get_folders(args["filename"])
-    if args["files"]:
-        files = get_files(args["filename"])
+    try:
+        print("Parsing ", args["filename"],"...")
+        if args["folders"]:
+            folders = get_folders(args["filename"])
+        if args["files"]:
+            files = get_files(args["filename"])
+    except ET.ParseError:
+        pass
+    try:
+        list_of_urls = read_file(args["filename"])
+        if args["folders"]:
+            folders = split_path(list_of_urls)
+    except:
+        print("error")
 
     wordlist["folders"] = folders
     wordlist["files"] = files
