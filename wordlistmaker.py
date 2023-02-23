@@ -53,11 +53,12 @@ def get_folders(filename):
                         if word not in folders and word != "" and "." not in word:
                             folders.append(word)
                 folders.sort()
+            return folders
     except UnicodeDecodeError:
         sys.exit("Can't decode the content of the file.")
     except ET.ParseError:
-        return
-        return folders
+        raise
+        
 
 
 def split_path(urls):
@@ -71,7 +72,7 @@ def split_path(urls):
     return folders
 
 
-def read_file(filename):
+def parse_txt_file(filename):
     list_of_urls = []
     with open(filename, encoding="utf 8") as f:
         for line in f:
@@ -95,11 +96,17 @@ def start_cli_parser():
 
 
 def wordstree():
+    """Takes input from the cli parser, pass it to the parsing functions and then returns
+    the wordlist.
+    """
     wordlist = dict()
     folders = []
     files = []
+    known_urls_list = []
     parser = start_cli_parser()
     args = vars(parser.parse_args())
+
+    # Check if the file exists and send it to the parsing functions
     try:
         print("Parsing ", args["filename"], "...")
         if args["folders"]:
@@ -108,17 +115,29 @@ def wordstree():
             files = get_files(args["filename"])
     except FileNotFoundError:
         sys.exit("No such file or directory.")
-
-    try:
-        list_of_urls = read_file(args["filename"])
+        
+    # If the xml parser returns an error, then it is a txt file and we send
+    # it to the txt parsing functions
+    except ET.ParseError:
+        known_urls_list = parse_txt_file(args["filename"])
         if args["folders"]:
-            folders = split_path(list_of_urls)
-    except UnicodeDecodeError:
-        sys.exit("Can't decode the content of the doc file.")
+            folders = split_path(known_urls_list)
+            wordlist["folders"] = folders
+
+        # Da fare i file
+        # if args["files"]:
+        #     files = get_files(args["filename"])
+        # wordlist["files"] = files
+
+        print_result(wordlist)
     else:
         wordlist["folders"] = folders
         wordlist["files"] = files
         print_result(wordlist)
+     
+    
+    
+    
 
 
 if __name__ == "__main__":
