@@ -1,5 +1,6 @@
 import argparse
 import errno
+import os
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -35,8 +36,7 @@ def get_files(filename):
     except UnicodeDecodeError:
         sys.exit("Can't decode the content of the file.")
     except ET.ParseError:
-        return
-        return files
+        raise
 
 
 def get_folders(filename):
@@ -58,27 +58,39 @@ def get_folders(filename):
         sys.exit("Can't decode the content of the file.")
     except ET.ParseError:
         raise
-        
 
 
-def split_path(urls):
-    folders = []
-    for url in urls:
-        words = urlparse(url).path.split("/")
-        for word in words:
-            if word not in folders and word != "" and "." not in word:
-                folders.append(word)
-    folders.sort()
-    return folders
+# def split_path(urls):
+#     folders = []
+#     for url in urls:
+#         words = urlparse(url).path.split("/")
+#         for word in words:
+#             if word not in folders and word != "" and "." not in word:
+#                 folders.append(word)
+#     folders.sort()
+#     return folders
 
 
-def parse_txt_file(filename):
-    list_of_urls = []
+def parse_txt_file(filename, directories=False, files=False):
+    directories_list = []
+    files_list = []
     with open(filename, encoding="utf 8") as f:
-        for line in f:
-            url = line.strip()
-            list_of_urls.append(url)
-    return list_of_urls
+        if directories:
+            for line in f:
+                url = line.strip()
+                words = urlparse(url).path.split("/")
+                for word in words:
+                    if word not in directories_list and word != "" and "." not in word:
+                        directories_list.append(word)
+            return directories_list
+
+        if files:
+            for line in f:
+                url = line.strip()
+                word = Path(urlparse(url).path).name
+                if word not in files_list and word != "" and "." in word:
+                    files_list.append(word)
+            return files_list
 
 
 def start_cli_parser():
@@ -87,7 +99,10 @@ def start_cli_parser():
     )
     parser.add_argument("filename", type=str, help="A saved burpsuite xml file.")
     parser.add_argument(
-        "-F", "--folders", help="Print observed folders names.", action="store_true"
+        "-d",
+        "--directories",
+        help="Print observed directories names.",
+        action="store_true",
     )
     parser.add_argument(
         "-f", "--files", help="Print observed filenames.", action="store_true"
@@ -96,48 +111,44 @@ def start_cli_parser():
 
 
 def wordstree():
-    """Takes input from the cli parser, pass it to the parsing functions and then returns
+    """Takes input from the cli, pass it to the parsing functions and then returns
     the wordlist.
     """
     wordlist = dict()
-    folders = []
+    directories = []
     files = []
     known_urls_list = []
     parser = start_cli_parser()
     args = vars(parser.parse_args())
 
-    # Check if the file exists and send it to the parsing functions
+    # If not empty, send the xml parsing functions
     try:
+        if os.stat(args["filename"]).st_size == 0:
+            sys.exit("The file is empty.")
         print("Parsing ", args["filename"], "...")
-        if args["folders"]:
-            folders = get_folders(args["filename"])
+        if args["directories"]:
+            directories = get_folders(args["filename"])
         if args["files"]:
             files = get_files(args["filename"])
     except FileNotFoundError:
         sys.exit("No such file or directory.")
-        
-    # If the xml parser returns an error, then it is a txt file and we send
-    # it to the txt parsing functions
-    except ET.ParseError:
-        known_urls_list = parse_txt_file(args["filename"])
-        if args["folders"]:
-            folders = split_path(known_urls_list)
-            wordlist["folders"] = folders
 
-        # Da fare i file
-        # if args["files"]:
-        #     files = get_files(args["filename"])
-        # wordlist["files"] = files
+    # If the xml parser raises a parsing error, send the file to the txt
+    # parsing functions.
+    except ET.ParseError:
+        if args["directories"]:
+            directories = parse_txt_file(args["filename"], True)
+            wordlist["directories"] = directories
+
+        elif args["files"]:
+            files = parse_txt_file(args["filename"], False, True)
+            wordlist["files"] = files
 
         print_result(wordlist)
     else:
-        wordlist["folders"] = folders
+        wordlist["directories"] = directories
         wordlist["files"] = files
         print_result(wordlist)
-     
-    
-    
-    
 
 
 if __name__ == "__main__":
