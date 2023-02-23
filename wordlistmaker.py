@@ -71,9 +71,12 @@ def get_folders(filename):
 #     return folders
 
 
-def parse_txt_file(filename, directories=False, files=False):
+def parse_txt_file(
+    filename, directories=False, files=False, param_names=False, param_values=False
+):
     directories_list = []
     files_list = []
+
     with open(filename, encoding="utf 8") as f:
         if directories:
             for line in f:
@@ -83,7 +86,6 @@ def parse_txt_file(filename, directories=False, files=False):
                     if word not in directories_list and word != "" and "." not in word:
                         directories_list.append(word)
             return directories_list
-
         if files:
             for line in f:
                 url = line.strip()
@@ -91,6 +93,18 @@ def parse_txt_file(filename, directories=False, files=False):
                 if word not in files_list and word != "" and "." in word:
                     files_list.append(word)
             return files_list
+        if param_names:
+            for line in f:
+                url = line.strip()
+                param_name_and_value = urlparse(url).query.replace("&", "=").split("=")
+                param_name_only_list = param_name_and_value[::2]
+            return param_name_only_list
+        if param_values:
+            for line in f:
+                url = line.strip()
+                param_name_and_value = urlparse(url).query.replace("&", "=").split("=")
+                param_value_only_list = param_name_and_value[1::2]
+            return param_value_only_list
 
 
 def start_cli_parser():
@@ -107,6 +121,12 @@ def start_cli_parser():
     parser.add_argument(
         "-f", "--files", help="Print observed filenames.", action="store_true"
     )
+    parser.add_argument(
+        "-pn", "--pnames", help="Print observed parameter names.", action="store_true"
+    )
+    parser.add_argument(
+        "-pv", "--pvalues", help="Print observed parameter values.", action="store_true"
+    )
     return parser
 
 
@@ -115,9 +135,9 @@ def wordstree():
     the wordlist.
     """
     wordlist = dict()
-    directories = []
-    files = []
-    known_urls_list = []
+    directories_list = []
+    files_list = []
+    param_names_list = []
     parser = start_cli_parser()
     args = vars(parser.parse_args())
 
@@ -128,7 +148,11 @@ def wordstree():
         print("Parsing ", args["filename"], "...")
         if args["directories"]:
             directories = get_folders(args["filename"])
-        if args["files"]:
+        elif args["files"]:
+            files = get_files(args["filename"])
+        elif args["pnames"]:
+            files = get_files(args["filename"])
+        elif args["pvalues"]:
             files = get_files(args["filename"])
     except FileNotFoundError:
         sys.exit("No such file or directory.")
@@ -137,12 +161,19 @@ def wordstree():
     # parsing functions.
     except ET.ParseError:
         if args["directories"]:
-            directories = parse_txt_file(args["filename"], True)
-            wordlist["directories"] = directories
-
+            directories_list = parse_txt_file(args["filename"], True)
+            wordlist["directories"] = directories_list
         elif args["files"]:
-            files = parse_txt_file(args["filename"], False, True)
-            wordlist["files"] = files
+            files_list = parse_txt_file(args["filename"], False, True)
+            wordlist["files"] = files_list
+        elif args["pnames"]:
+            param_names_list = parse_txt_file(args["filename"], False, False, True)
+            wordlist["param names"] = param_names_list
+        elif args["pvalues"]:
+            param_names_list = parse_txt_file(
+                args["filename"], False, False, False, True
+            )
+            wordlist["param values"] = param_names_list
 
         print_result(wordlist)
     else:
