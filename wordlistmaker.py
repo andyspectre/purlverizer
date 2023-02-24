@@ -122,10 +122,10 @@ def start_cli_parser():
         "-f", "--files", help="Print observed filenames.", action="store_true"
     )
     parser.add_argument(
-        "-pn", "--pnames", help="Print observed parameter names.", action="store_true"
+        "-n", "--param-names", help="Print observed parameter names.", action="store_true"
     )
     parser.add_argument(
-        "-pv", "--pvalues", help="Print observed parameter values.", action="store_true"
+        "-v", "--param-values", help="Print observed parameter values.", action="store_true"
     )
     return parser
 
@@ -138,8 +138,10 @@ def wordstree():
     directories_list = []
     files_list = []
     param_names_list = []
+    param_values_list = []
     parser = start_cli_parser()
     args = vars(parser.parse_args())
+
 
     # If not empty, send the xml parsing functions
     try:
@@ -150,9 +152,9 @@ def wordstree():
             directories = get_folders(args["filename"])
         elif args["files"]:
             files = get_files(args["filename"])
-        elif args["pnames"]:
+        elif args["param_names"]:
             files = get_files(args["filename"])
-        elif args["pvalues"]:
+        elif args["param_values"]:
             files = get_files(args["filename"])
     except FileNotFoundError:
         sys.exit("No such file or directory.")
@@ -166,14 +168,14 @@ def wordstree():
         elif args["files"]:
             files_list = parse_txt_file(args["filename"], False, True)
             wordlist["files"] = files_list
-        elif args["pnames"]:
+        elif args["param_names"]:
             param_names_list = parse_txt_file(args["filename"], False, False, True)
             wordlist["param names"] = param_names_list
-        elif args["pvalues"]:
-            param_names_list = parse_txt_file(
+        elif args["param_values"]:
+            param_values_list = parse_txt_file(
                 args["filename"], False, False, False, True
             )
-            wordlist["param values"] = param_names_list
+            wordlist["param values"] = param_values_list
 
         print_result(wordlist)
     else:
