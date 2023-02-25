@@ -23,7 +23,6 @@ def get_files(filename):
             tree = ET.parse(f)
             files = []
             for tag in tree.iter():
-
                 # get file from url
                 if tag.tag == "url":
                     words = urlparse(tag.text)
@@ -45,7 +44,6 @@ def get_folders(filename):
             tree = ET.parse(f)
             folders = []
             for tag in tree.iter():
-
                 # split urls based on '/' to get folders
                 if tag.tag == "url":
                     words = urlparse(tag.text).path.split("/")
@@ -76,6 +74,7 @@ def parse_txt_file(
 ):
     directories_list = []
     files_list = []
+    param_name_only_list = []
 
     with open(filename, encoding="utf 8") as f:
         if directories:
@@ -83,7 +82,8 @@ def parse_txt_file(
                 url = line.strip()
                 words = urlparse(url).path.split("/")
                 for word in words:
-                    if word not in directories_list and word != "" and "." not in word:
+                    word = unquote(word)
+                    if word not in directories_list and word != '' and '.' not in word:
                         directories_list.append(word)
             return directories_list
         if files:
@@ -96,8 +96,18 @@ def parse_txt_file(
         if param_names:
             for line in f:
                 url = line.strip()
-                param_name_and_value = urlparse(url).query.replace("&", "=").split("=")
-                param_name_only_list = param_name_and_value[::2]
+                param_name_and_value = urlparse(url).query.replace("=", "&").split("&")
+                if param_name_and_value[0] == "":
+                    pass
+                elif len(param_name_and_value) == 2:
+                    if param_name_and_value[0] not in param_name_only_list:
+                        param_name_only_list.append(param_name_and_value[0])
+                else:
+                    param_name_and_value = param_name_and_value[::2]
+                    for param in param_name_and_value:
+                        if param not in param_name_only_list:
+                            param_name_only_list.append(param)
+            param_name_only_list.sort()
             return param_name_only_list
         if param_values:
             for line in f:
@@ -122,10 +132,16 @@ def start_cli_parser():
         "-f", "--files", help="Print observed filenames.", action="store_true"
     )
     parser.add_argument(
-        "-n", "--param-names", help="Print observed parameter names.", action="store_true"
+        "-n",
+        "--param-names",
+        help="Print observed parameter names.",
+        action="store_true",
     )
     parser.add_argument(
-        "-v", "--param-values", help="Print observed parameter values.", action="store_true"
+        "-v",
+        "--param-values",
+        help="Print observed parameter values.",
+        action="store_true",
     )
     return parser
 
@@ -142,7 +158,6 @@ def wordstree():
     parser = start_cli_parser()
     args = vars(parser.parse_args())
 
-
     # If not empty, send the xml parsing functions
     try:
         if os.stat(args["filename"]).st_size == 0:
@@ -150,7 +165,7 @@ def wordstree():
         print("Parsing ", args["filename"], "...")
         if args["directories"]:
             directories = get_folders(args["filename"])
-        elif args["files"]:
+        if args["files"]:
             files = get_files(args["filename"])
         elif args["param_names"]:
             files = get_files(args["filename"])
@@ -165,7 +180,7 @@ def wordstree():
         if args["directories"]:
             directories_list = parse_txt_file(args["filename"], True)
             wordlist["directories"] = directories_list
-        elif args["files"]:
+        if args["files"]:
             files_list = parse_txt_file(args["filename"], False, True)
             wordlist["files"] = files_list
         elif args["param_names"]:
