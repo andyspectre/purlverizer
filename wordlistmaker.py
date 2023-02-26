@@ -39,10 +39,18 @@ def print_result(wordlist):
         for i in v:
             print(i)
 
-def remove_bytes(wordlist):
-    for word in wordlist:
-        bytes(word,"UTF-8").decode("utf-8","ignore")
-    return wordlist
+
+def remove_nonprintable_chars(wordlist):
+    """
+    description: accept a list of strings (a wordlist) and return a new list containing only strings with printable characters.
+    parameters:
+        wordlist: a list of strings
+    return: a list of strings (original wordlist - strings with nonprintable characters)
+    """
+
+    no_nonprintable_wordlist = [word for word in wordlist if word.isprintable()]
+    return no_nonprintable_wordlist
+
 
 def remove_numbers(wordlist):
     """
@@ -51,7 +59,9 @@ def remove_numbers(wordlist):
         wordlist: a list of strings
     return: a list of strings (original wordlist - strings with numbers)
     """
-    no_numbers_wordlist = [word for word in wordlist if not bool(re.search(r"\d", word))]
+    no_numbers_wordlist = [
+        word for word in wordlist if not bool(re.search(r"\d", word))
+    ]
     return no_numbers_wordlist
 
 
@@ -159,11 +169,11 @@ def start_cli_parser():
         choices=["dirs", "files", "param-names", "param-values"],
     )
     parser.add_argument(
-        "--weird-chars",
-        help="Exclude results that contain weird characters and broken encoding.",
-        choices=["dirs", "files", "param-names", "param-values"],
+        "--nonprintable",
+        help="Exclude results that contain nonprintable characters.",
+        action="store_false",
     )
-    
+
     return parser
 
 
@@ -179,32 +189,21 @@ def wordstree():
     parser = start_cli_parser()
     args = vars(parser.parse_args())
 
-    # If not empty, send the xml parsing functions
     try:
         if os.stat(args["filename"]).st_size == 0:
             sys.exit("The file is empty.")
         print("Parsing ", args["filename"], "...")
         if args["directories"]:
-            if args["no_numbers"] == "dirs":
-                directories = remove_numbers(get_directories(args["filename"]))
-            if args["weird_chars"] == "dirs":
-                directories = remove_bytes(get_directories(args["filename"]))
-
-            else:
-                directories = get_directories(args["filename"])
-
-        # if args["files"]:
-        #     files = get_files(args["filename"])
-        # elif args["param_names"]:
-        #     files = get_files(args["filename"])
-        # elif args["param_values"]:
-        #     files = get_files(args["filename"])
+            directories_list = get_directories(args["filename"])
+        if args["no_numbers"] == "dirs":
+            directories_list = remove_numbers(directories_list)
 
     except FileNotFoundError:
         sys.exit("No such file or directory.")
     else:
-        wordlist["directories"] = directories
-        # wordlist["files"] = files
+        if args["nonprintable"]:
+            directories_list = remove_nonprintable_chars(directories_list)
+        wordlist["directories"] = directories_list
         print_result(wordlist)
 
 
