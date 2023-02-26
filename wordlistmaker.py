@@ -3,6 +3,7 @@ import errno
 import os
 import re
 import sys
+import tracemalloc
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -65,7 +66,10 @@ def remove_numbers(wordlist):
     return no_numbers_wordlist
 
 
-def get_directories(filename):
+tracemalloc.start()
+
+
+def get_directories(read_data):
     """
     description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories.
     parameters:
@@ -73,18 +77,18 @@ def get_directories(filename):
     return: a list of strings (filenames)
     """
     directories_list = []
-    with open(filename, encoding="utf 8") as f:
-        for line in f:
-            url = line.strip()
-            words = urlparse(url).path.split("/")
-            for word in words:
-                word = unquote(word)
-                if word not in directories_list and word != "" and "." not in word:
-                    directories_list.append(word)
-        directories_list.sort()
-        return directories_list
 
-def get_files(filename):
+    for url in read_data.split("\n"):
+        words = urlparse(url).path.split("/")
+        for word in words:
+            word = unquote(word)
+            if word not in directories_list and word != "" and "." not in word:
+                directories_list.append(word)
+    directories_list.sort()
+    return directories_list
+
+
+def get_files(read_data):
     """
     description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories.
     parameters:
@@ -92,13 +96,11 @@ def get_files(filename):
     return: a list of strings (filenames)
     """
     files_list = []
-    with open(filename, encoding="utf 8") as f:
-        for line in f:
-            url = line.strip()
-            word = Path(urlparse(url).path).name
-            if word not in files_list and word != "" and "." in word:
-                files_list.append(word)
-        return files_list
+    for url in read_data.split("\n"):
+        word = Path(urlparse(url).path).name
+        if word not in files_list and word != "" and "." in word:
+            files_list.append(word)
+    return files_list
 
 
 def parse_txt_file(
@@ -108,7 +110,6 @@ def parse_txt_file(
     files_list = []
     param_name_only_list = []
 
-  
     # if param_names:
     #     for line in f:
     #         url = line.strip()
@@ -192,12 +193,17 @@ def wordstree():
     try:
         if os.stat(args["filename"]).st_size == 0:
             sys.exit("The file is empty.")
-        print("Parsing ", args["filename"], "...")
-        if args["directories"]:
-            directories_list = get_directories(args["filename"])
-        if args["files"]:
-            files_list = get_files(args["filename"])
-        
+        with open((args["filename"]), encoding="utf 8") as f:
+            print("Parsing ", args["filename"], "...")
+            read_data = f.read()
+            if args["directories"]:
+                directories_list = get_directories(read_data)
+            if args["files"]:
+                files_list = get_files(read_data)
+
+        current, peak = tracemalloc.get_traced_memory()
+        print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+        tracemalloc.stop()
 
     except FileNotFoundError:
         sys.exit("No such file or directory.")
@@ -207,6 +213,7 @@ def wordstree():
         if args["nonprintable"]:
             directories_list = remove_nonprintable_chars(directories_list)
         wordlist["directories"] = directories_list
+        wordlist["file"] = files_list
         print_result(wordlist)
 
 
