@@ -84,16 +84,21 @@ def get_directories(filename):
         directories_list.sort()
         return directories_list
 
-
-# def split_path(urls):
-#     folders = []
-#     for url in urls:
-#         words = urlparse(url).path.split("/")
-#         for word in words:
-#             if word not in folders and word != "" and "." not in word:
-#                 folders.append(word)
-#     folders.sort()
-#     return folders
+def get_files(filename):
+    """
+    description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories.
+    parameters:
+        filename: a Burp Suite XML file or a txt file with a list of URLs
+    return: a list of strings (filenames)
+    """
+    files_list = []
+    with open(filename, encoding="utf 8") as f:
+        for line in f:
+            url = line.strip()
+            word = Path(urlparse(url).path).name
+            if word not in files_list and word != "" and "." in word:
+                files_list.append(word)
+        return files_list
 
 
 def parse_txt_file(
@@ -103,12 +108,7 @@ def parse_txt_file(
     files_list = []
     param_name_only_list = []
 
-    #     for line in f:
-    #         url = line.strip()
-    #         word = Path(urlparse(url).path).name
-    #         if word not in files_list and word != "" and "." in word:
-    #             files_list.append(word)
-    #     return files_list
+  
     # if param_names:
     #     for line in f:
     #         url = line.strip()
@@ -195,12 +195,15 @@ def wordstree():
         print("Parsing ", args["filename"], "...")
         if args["directories"]:
             directories_list = get_directories(args["filename"])
-        if args["no_numbers"] == "dirs":
-            directories_list = remove_numbers(directories_list)
+        if args["files"]:
+            files_list = get_files(args["filename"])
+        
 
     except FileNotFoundError:
         sys.exit("No such file or directory.")
     else:
+        if args["no_numbers"] == "dirs":
+            directories_list = remove_numbers(directories_list)
         if args["nonprintable"]:
             directories_list = remove_nonprintable_chars(directories_list)
         wordlist["directories"] = directories_list
