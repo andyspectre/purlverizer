@@ -3,9 +3,12 @@ import errno
 import os
 import re
 import sys
+import tracemalloc
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import unquote, urlparse
+
+tracemalloc.start()
 
 # Tengo questa solo come esempio di utilizzo di xml.etree
 #
@@ -63,6 +66,7 @@ def remove_numbers(wordlist):
         word for word in wordlist if not bool(re.search(r"\d", word))
     ]
     return no_numbers_wordlist
+
 
 
 def get_directories(filename):
@@ -206,8 +210,17 @@ def wordstree():
             directories_list = remove_numbers(directories_list)
         if args["nonprintable"]:
             directories_list = remove_nonprintable_chars(directories_list)
+        current, peak = tracemalloc.get_traced_memory()
+        
+        
+        
         wordlist["directories"] = directories_list
+        wordlist["files"] = files_list
         print_result(wordlist)
+
+        current, peak = tracemalloc.get_traced_memory()
+        print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+        tracemalloc.stop()
 
 
 if __name__ == "__main__":
