@@ -8,6 +8,54 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+
+tracemalloc.start()
+
+WANTED_EXT = [
+    ".asp",
+    ".aspx",
+    ".bak" ".bat",
+    ".c",
+    ".cfm",
+    ".cgi",
+    ".css",
+    ".com",
+    ".dll",
+    ".do",
+    ".exe",
+    ".htm",
+    ".html",
+    ".inc",
+    ".jhtml",
+    ".js",
+    ".jsa",
+    ".json",
+    ".jsp",
+    ".log",
+    ".mdb",
+    ".nsf",
+    ".old",
+    ".pcap",
+    ".php",
+    ".php2",
+    ".php3",
+    ".php4",
+    ".php5",
+    ".php6",
+    ".php7",
+    ".phps",
+    ".pht",
+    ".phtml",
+    ".pl",
+    ".reg",
+    ".sh",
+    ".shtml",
+    ".sql",
+    ".swf",
+    ".txt",
+    ".xml",
+]
+
 # Tengo questa solo come esempio di utilizzo di xml.etree
 #
 # def get_files(filename):
@@ -41,6 +89,16 @@ def print_result(wordlist):
             print(i)
 
 
+def show_all_files(files_list):
+    """description: accept a list of strings (filenames) and return a new list containing only strings that contains certain whitelisted pattern (file extension).
+    parameters:
+        files_list: a list of strings
+    return: a list of strings (original wordlist - strings that don't contain the whitelisted pattern)
+    """
+    all_files_list = [f for f in files_list if Path(f).suffix in WANTED_EXT]
+    return all_files_list
+
+
 def remove_nonprintable_chars(wordlist):
     """
     description: accept a list of strings (a wordlist) and return a new list containing only strings with printable characters.
@@ -66,9 +124,6 @@ def remove_numbers(wordlist):
     return no_numbers_wordlist
 
 
-tracemalloc.start()
-
-
 def get_directories(read_data):
     """
     description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories.
@@ -81,7 +136,8 @@ def get_directories(read_data):
     for url in read_data.split("\n"):
         words = urlparse(url).path.split("/")
         for word in words:
-            word = unquote(word)
+            # word = unquote(word) -> non sono sicuro se voglio decodificare o no
+
             if word not in directories_list and word != "" and "." not in word:
                 directories_list.append(word)
     directories_list.sort()
@@ -97,9 +153,11 @@ def get_files(read_data):
     """
     files_list = []
     for url in read_data.split("\n"):
+        # word = unquote(Path(urlparse(url).path).name) -> non sono sicuro se voglio decodificare o no
         word = Path(urlparse(url).path).name
         if word not in files_list and word != "" and "." in word:
             files_list.append(word)
+    files_list.sort()
     return files_list
 
 
@@ -171,7 +229,14 @@ def start_cli_parser():
     )
     parser.add_argument(
         "--nonprintable",
-        help="Exclude results that contain nonprintable characters.",
+        help="Include results that contain nonprintable characters.",
+        action="store_false",
+    )
+    parser.add_argument(
+        "--all-files",
+        # di default off ma immagino che tutti vogliano vedere "all kind of files..."
+        # forse meglio di default visualizzarli tutti e aggiungere un "filter most common"
+        help="Include results that contain all kind of files.",
         action="store_false",
     )
 
@@ -201,20 +266,25 @@ def wordstree():
             if args["files"]:
                 files_list = get_files(read_data)
 
-        current, peak = tracemalloc.get_traced_memory()
-        print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
-        tracemalloc.stop()
-
     except FileNotFoundError:
         sys.exit("No such file or directory.")
     else:
         if args["no_numbers"] == "dirs":
             directories_list = remove_numbers(directories_list)
+        if args["no_numbers"] == "files":
+            files_list = remove_numbers(files_list)
         if args["nonprintable"]:
             directories_list = remove_nonprintable_chars(directories_list)
+            files_list = remove_nonprintable_chars(files_list)
+        if args["all_files"]:
+            files_list = show_all_files(files_list)
         wordlist["directories"] = directories_list
         wordlist["file"] = files_list
         print_result(wordlist)
+
+        current, peak = tracemalloc.get_traced_memory()
+        print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+        tracemalloc.stop()
 
 
 if __name__ == "__main__":
