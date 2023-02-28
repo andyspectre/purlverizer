@@ -160,6 +160,23 @@ def get_files(read_data):
     files_list.sort()
     return files_list
 
+def get_param_names(read_data):
+    param_names_list = []
+    for url in read_data.split('\n'):
+        param_name_and_value = urlparse(url).query.replace("=", "&").split("&")
+        if param_name_and_value[0] == "":
+            pass
+        elif len(param_name_and_value) == 2:
+            if param_name_and_value[0] not in param_names_list:
+                param_names_list.append(param_name_and_value[0])
+        else:
+            param_name_and_value = param_name_and_value[::2]
+            for param in param_name_and_value:
+                if param not in param_names_list:
+                    param_names_list.append(param)
+    param_names_list.sort()
+    return param_names_list
+
 
 def parse_txt_file(
     filename, directories=False, files=False, param_names=False, param_values=False
@@ -168,22 +185,7 @@ def parse_txt_file(
     files_list = []
     param_name_only_list = []
 
-    # if param_names:
-    #     for line in f:
-    #         url = line.strip()
-    #         param_name_and_value = urlparse(url).query.replace("=", "&").split("&")
-    #         if param_name_and_value[0] == "":
-    #             pass
-    #         elif len(param_name_and_value) == 2:
-    #             if param_name_and_value[0] not in param_name_only_list:
-    #                 param_name_only_list.append(param_name_and_value[0])
-    #         else:
-    #             param_name_and_value = param_name_and_value[::2]
-    #             for param in param_name_and_value:
-    #                 if param not in param_name_only_list:
-    #                     param_name_only_list.append(param)
-    #     param_name_only_list.sort()
-    #     return param_name_only_list
+    
     # if param_values:
     #     for line in f:
     #         url = line.strip()
@@ -265,6 +267,9 @@ def wordstree():
                 directories_list = get_directories(read_data)
             if args["files"]:
                 files_list = get_files(read_data)
+            if args["param_names"]:
+                param_names_list = get_param_names(read_data)
+            
 
     except FileNotFoundError:
         sys.exit("No such file or directory.")
@@ -273,6 +278,8 @@ def wordstree():
             directories_list = remove_numbers(directories_list)
         if args["no_numbers"] == "files":
             files_list = remove_numbers(files_list)
+        if args["no_numbers"] == "param-names":
+            param_names_list = remove_numbers(param_names_list)
         if args["nonprintable"]:
             directories_list = remove_nonprintable_chars(directories_list)
             files_list = remove_nonprintable_chars(files_list)
@@ -280,6 +287,7 @@ def wordstree():
             files_list = show_all_files(files_list)
         wordlist["directories"] = directories_list
         wordlist["file"] = files_list
+        wordlist["param names"] = param_names_list
         print_result(wordlist)
 
         current, peak = tracemalloc.get_traced_memory()
