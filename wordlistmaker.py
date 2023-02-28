@@ -155,7 +155,13 @@ def get_files(read_data):
     for url in read_data.split("\n"):
         # word = unquote(Path(urlparse(url).path).name) -> non sono sicuro se voglio decodificare o no
         word = Path(urlparse(url).path).name
-        if word not in files_list and word != "" and "." in word:
+        if (
+            word not in files_list
+            and word != ""
+            and "." in word
+            and "&" not in word
+            and "=" not in word
+        ):
             files_list.append(word)
     files_list.sort()
     return files_list
