@@ -11,7 +11,7 @@ from urllib.parse import unquote, urlparse
 
 tracemalloc.start()
 
-WANTED_EXT = [
+COMMON_EXTENSIONS = [
     ".asp",
     ".aspx",
     ".bak" ".bat",
@@ -95,7 +95,7 @@ def show_all_files(files_list):
         files_list: a list of strings
     return: a list of strings (original wordlist - strings that don't contain the whitelisted pattern)
     """
-    all_files_list = [f for f in files_list if Path(f).suffix in WANTED_EXT]
+    all_files_list = [f for f in files_list if Path(f).suffix in COMMON_EXTENSIONS]
     return all_files_list
 
 
@@ -155,13 +155,7 @@ def get_files(read_data):
     for url in read_data.split("\n"):
         # word = unquote(Path(urlparse(url).path).name) -> non sono sicuro se voglio decodificare o no
         word = Path(urlparse(url).path).name
-        if (
-            word not in files_list
-            and word != ""
-            and "." in word
-            and "&" not in word
-            and "=" not in word
-        ):
+        if word not in files_list and word != "" and "." in word:
             files_list.append(word)
     files_list.sort()
     return files_list
