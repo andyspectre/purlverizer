@@ -199,10 +199,7 @@ def start_cli_parser():
         description="Take a list of URLs or a Burp Suite XML file as input and get a list of: directories, files, parameters names, parameters values and links."
     )
     parser.add_argument(
-        "filename",
-        type=str,
-        help="Path to the URLs list or to the Burp Suite XML file.",
-    )
+        "-u", "--url", help="Path to the URLs list or to the Burp Suite XML file.")
     parser.add_argument(
         "-d",
         "--directories",
@@ -258,10 +255,10 @@ def wordstree():
     args = vars(parser.parse_args())
 
     try:
-        if os.stat(args["filename"]).st_size == 0:
+        if os.stat(args["url"]).st_size == 0:
             sys.exit("The file is empty.")
-        with open((args["filename"]), encoding="utf 8") as f:
-            print("Parsing ", args["filename"], "...")
+        with open((args["url"]), encoding="utf 8") as f:
+            print("Parsing ", args["url"], "...")
             read_data = f.read()
             if args["directories"]:
                 directories_list = get_directories(read_data)
