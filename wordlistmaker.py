@@ -271,12 +271,13 @@ def wordstree():
     except FileNotFoundError:
         sys.exit("No such file or directory.")
     else:
-        if args["no_numbers"] == "dirs":
-            directories_list = remove_numbers(directories_list)
-        if args["no_numbers"] == "files":
-            files_list = remove_numbers(files_list)
-        if args["no_numbers"] == "param-names":
-            param_names_list = remove_numbers(param_names_list)
+        if args["no_numbers"]:
+            if "dirs" in args["no_numbers"]:
+                directories_list = remove_numbers(directories_list)
+            if "files" in args["no_numbers"]:
+                files_list = remove_numbers(files_list)
+            if "param-names" in args["no_numbers"]:
+                param_names_list = remove_numbers(param_names_list)
         if args["nonprintable"]:
             directories_list = remove_nonprintable_chars(directories_list)
             files_list = remove_nonprintable_chars(files_list)
