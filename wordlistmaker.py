@@ -126,7 +126,7 @@ def remove_numbers(wordlist):
 
 def get_directories(read_data):
     """
-    description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories.
+    description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories
     parameters:
         filename: a Burp Suite XML file or a txt file with a list of URLs
     return: a list of strings (filenames)
@@ -136,7 +136,8 @@ def get_directories(read_data):
     for url in read_data.split("\n"):
         words = urlparse(url).path.split("/")
         for word in words:
-            # word = unquote(word) -> non sono sicuro se voglio decodificare o no
+            # Non sono sicuro se voglio decodificare o no. Per decodificare, uncommentare la riga sotto.
+            # word = unquote(word)
 
             if word not in directories_list and word != "" and "." not in word:
                 directories_list.append(word)
