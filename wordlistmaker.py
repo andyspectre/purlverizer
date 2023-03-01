@@ -160,9 +160,10 @@ def get_files(read_data):
     files_list.sort()
     return files_list
 
+
 def get_param_names(read_data):
     param_names_list = []
-    for url in read_data.split('\n'):
+    for url in read_data.split("\n"):
         param_name_and_value = urlparse(url).query.replace("=", "&").split("&")
         if param_name_and_value[0] == "":
             pass
@@ -185,7 +186,6 @@ def parse_txt_file(
     files_list = []
     param_name_only_list = []
 
-    
     # if param_values:
     #     for line in f:
     #         url = line.strip()
@@ -226,8 +226,8 @@ def start_cli_parser():
     )
     parser.add_argument(
         "--no-numbers",
-        help="Exclude results that contain numbers.",
-        choices=["dirs", "files", "param-names", "param-values"],
+        help="Exclude results that contain numbers. Accepted values: dirs, files, param-names, param-values",
+        nargs="*",
     )
     parser.add_argument(
         "--nonprintable",
@@ -269,7 +269,6 @@ def wordstree():
                 files_list = get_files(read_data)
             if args["param_names"]:
                 param_names_list = get_param_names(read_data)
-            
 
     except FileNotFoundError:
         sys.exit("No such file or directory.")
