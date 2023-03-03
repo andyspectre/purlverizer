@@ -186,7 +186,7 @@ def get_param_values(read_data):
         if query[0] == "":
             pass
         elif len(query) == 2:
-            if query[0] not in param_values_list:
+            if query[1] not in param_values_list:
                 param_values_list.append(query[1])
         else:
             query = query[1::2]
