@@ -179,6 +179,22 @@ def get_param_names(read_data):
     param_names_list.sort()
     return param_names_list
 
+def get_param_values(read_data):
+    param_values_list = []
+    for url in read_data.split("\n"):
+        param_name_and_value = urlparse(url).query.replace("=", "&").split("&")
+        if param_name_and_value[0] == "":
+            pass
+        elif len(param_name_and_value) == 2:
+            if param_name_and_value[0] not in param_values_list:
+                param_values_list.append(param_name_and_value[1])
+        else:
+            param_value_only_list = param_name_and_value[1::2]
+            for param in param_name_and_value:
+                if param not in param_values_list:
+                    param_values_list.append(param)
+    param_values_list.sort()
+    return param_values_list
 
 def parse_txt_file(
     filename, directories=False, files=False, param_names=False, param_values=False
@@ -187,12 +203,7 @@ def parse_txt_file(
     files_list = []
     param_name_only_list = []
 
-    # if param_values:
-    #     for line in f:
-    #         url = line.strip()
-    #         param_name_and_value = urlparse(url).query.replace("&", "=").split("=")
-    #         param_value_only_list = param_name_and_value[1::2]
-    #     return param_value_only_list
+
 
 
 def start_cli_parser():
@@ -255,18 +266,24 @@ def wordstree():
     parser = start_cli_parser()
     args = vars(parser.parse_args())
 
+    
+
     try:
-        if os.stat(args["url"]).st_size == 0:
-            sys.exit("The file is empty.")
-        with open((args["url"]), encoding="utf 8") as f:
-            print("Parsing ", args["url"], "...")
-            read_data = f.read()
-            if args["directories"]:
-                directories_list = get_directories(read_data)
-            if args["files"]:
-                files_list = get_files(read_data)
-            if args["param_names"]:
-                param_names_list = get_param_names(read_data)
+        if not args["url"]:
+            parser.print_help()
+            sys.exit()
+        else:
+            if os.stat(args["url"]).st_size == 0:
+                sys.exit("The file is empty.")
+            with open((args["url"]), encoding="utf 8") as f:
+                print("Parsing ", args["url"], "...")
+                read_data = f.read()
+                if args["directories"]:
+                    directories_list = get_directories(read_data)
+                if args["files"]:
+                    files_list = get_files(read_data)
+                if args["param_names"]:
+                    param_names_list = get_param_names(read_data)
 
     except FileNotFoundError:
         sys.exit("No such file or directory.")
