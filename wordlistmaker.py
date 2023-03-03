@@ -179,6 +179,7 @@ def get_param_names(read_data):
     param_names_list.sort()
     return param_names_list
 
+
 def get_param_values(read_data):
     param_values_list = []
     for url in read_data.split("\n"):
@@ -196,14 +197,9 @@ def get_param_values(read_data):
     param_values_list.sort()
     return param_values_list
 
-def parse_txt_file(
-    filename, directories=False, files=False, param_names=False, param_values=False
-):
-    directories_list = []
-    files_list = []
-    param_name_only_list = []
 
-
+def read_file(path_to_file):
+    print()
 
 
 def start_cli_parser():
@@ -211,7 +207,8 @@ def start_cli_parser():
         description="Take a list of URLs or a Burp Suite XML file as input and get a list of: directories, files, parameters names, parameters values and links."
     )
     parser.add_argument(
-        "-u", "--url", help="Path to the URLs list or to the Burp Suite XML file.")
+        "-u", "--url", help="Path to the URLs list or to the Burp Suite XML file."
+    )
     parser.add_argument(
         "-d",
         "--directories",
@@ -266,8 +263,6 @@ def wordstree():
     parser = start_cli_parser()
     args = vars(parser.parse_args())
 
-    
-
     try:
         if not args["url"]:
             parser.print_help()
@@ -286,7 +281,6 @@ def wordstree():
                     param_names_list = get_param_names(read_data)
                 if args["param_values"]:
                     param_values_list = get_param_values(read_data)
-
     except FileNotFoundError:
         sys.exit("No such file or directory.")
     else:
@@ -306,10 +300,12 @@ def wordstree():
             param_values_list = remove_nonprintable_chars(param_values_list)
         if args["all_files"]:
             files_list = show_all_files(files_list)
+
         wordlist["directories"] = directories_list
         wordlist["file"] = files_list
         wordlist["param names"] = param_names_list
         wordlist["param values"] = param_values_list
+
         print_result(wordlist)
 
         current, peak = tracemalloc.get_traced_memory()
