@@ -198,9 +198,6 @@ def get_param_values(read_data):
     return param_values_list
 
 
-def read_file(path_to_file):
-    print()
-
 
 def start_cli_parser():
     parser = argparse.ArgumentParser(
