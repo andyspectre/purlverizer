@@ -8,7 +8,53 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+
 tracemalloc.start()
+
+COMMON_EXTENSIONS = [
+    ".asp",
+    ".aspx",
+    ".bak" ".bat",
+    ".c",
+    ".cfm",
+    ".cgi",
+    ".css",
+    ".com",
+    ".dll",
+    ".do",
+    ".exe",
+    ".htm",
+    ".html",
+    ".inc",
+    ".jhtml",
+    ".js",
+    ".jsa",
+    ".json",
+    ".jsp",
+    ".log",
+    ".mdb",
+    ".nsf",
+    ".old",
+    ".pcap",
+    ".php",
+    ".php2",
+    ".php3",
+    ".php4",
+    ".php5",
+    ".php6",
+    ".php7",
+    ".phps",
+    ".pht",
+    ".phtml",
+    ".pl",
+    ".reg",
+    ".sh",
+    ".shtml",
+    ".sql",
+    ".swf",
+    ".txt",
+    ".xml",
+]
 
 # Tengo questa solo come esempio di utilizzo di xml.etree
 #
@@ -43,6 +89,16 @@ def print_result(wordlist):
             print(i)
 
 
+def show_all_files(files_list):
+    """description: accept a list of strings (filenames) and return a new list containing only strings that contains certain whitelisted pattern (file extension).
+    parameters:
+        files_list: a list of strings
+    return: a list of strings (original wordlist - strings that don't contain the whitelisted pattern)
+    """
+    all_files_list = [f for f in files_list if Path(f).suffix in COMMON_EXTENSIONS]
+    return all_files_list
+
+
 def remove_nonprintable_chars(wordlist):
     """
     description: accept a list of strings (a wordlist) and return a new list containing only strings with printable characters.
@@ -68,27 +124,28 @@ def remove_numbers(wordlist):
     return no_numbers_wordlist
 
 
-
-def get_directories(filename):
+def get_directories(read_data):
     """
-    description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories.
+    description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories
     parameters:
         filename: a Burp Suite XML file or a txt file with a list of URLs
     return: a list of strings (filenames)
     """
     directories_list = []
-    with open(filename, encoding="utf 8") as f:
-        for line in f:
-            url = line.strip()
-            words = urlparse(url).path.split("/")
-            for word in words:
-                word = unquote(word)
-                if word not in directories_list and word != "" and "." not in word:
-                    directories_list.append(word)
-        directories_list.sort()
-        return directories_list
 
-def get_files(filename):
+    for url in read_data.split("\n"):
+        words = urlparse(url).path.split("/")
+        for word in words:
+            # Non sono sicuro se voglio decodificare o no. Per decodificare, uncommentare la riga sotto.
+            # word = unquote(word)
+
+            if word not in directories_list and word != "" and "." not in word:
+                directories_list.append(word)
+    directories_list.sort()
+    return directories_list
+
+
+def get_files(read_data):
     """
     description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories.
     parameters:
@@ -96,45 +153,53 @@ def get_files(filename):
     return: a list of strings (filenames)
     """
     files_list = []
-    with open(filename, encoding="utf 8") as f:
-        for line in f:
-            url = line.strip()
-            word = Path(urlparse(url).path).name
-            if word not in files_list and word != "" and "." in word:
-                files_list.append(word)
-        return files_list
+    for url in read_data.split("\n"):
+        # word = unquote(Path(urlparse(url).path).name) -> non sono sicuro se voglio decodificare o no
+        word = Path(urlparse(url).path).name
+        if word not in files_list and word != "" and "." in word:
+            files_list.append(word)
+    files_list.sort()
+    return files_list
 
 
-def parse_txt_file(
-    filename, directories=False, files=False, param_names=False, param_values=False
-):
-    directories_list = []
-    files_list = []
-    param_name_only_list = []
+def get_param_names(read_data):
+    param_names_list = []
+    for url in read_data.split("\n"):
+        query = urlparse(url).query.replace("=", "&").split("&")
+        if query[0] == "":
+            pass
+        elif len(query) == 2:
+            if query[0] not in param_names_list:
+                param_names_list.append(query[0])
+        else:
+            query = query[::2]
+            for param in query:
+                if param not in param_names_list:
+                    param_names_list.append(param)
+    param_names_list.sort()
+    return param_names_list
 
-  
-    # if param_names:
-    #     for line in f:
-    #         url = line.strip()
-    #         param_name_and_value = urlparse(url).query.replace("=", "&").split("&")
-    #         if param_name_and_value[0] == "":
-    #             pass
-    #         elif len(param_name_and_value) == 2:
-    #             if param_name_and_value[0] not in param_name_only_list:
-    #                 param_name_only_list.append(param_name_and_value[0])
-    #         else:
-    #             param_name_and_value = param_name_and_value[::2]
-    #             for param in param_name_and_value:
-    #                 if param not in param_name_only_list:
-    #                     param_name_only_list.append(param)
-    #     param_name_only_list.sort()
-    #     return param_name_only_list
-    # if param_values:
-    #     for line in f:
-    #         url = line.strip()
-    #         param_name_and_value = urlparse(url).query.replace("&", "=").split("=")
-    #         param_value_only_list = param_name_and_value[1::2]
-    #     return param_value_only_list
+
+def get_param_values(read_data):
+    param_values_list = []
+    for url in read_data.split("\n"):
+        query = urlparse(url).query.replace("=", "&").split("&")
+        if query[0] == "":
+            pass
+        elif len(query) == 2:
+            if query[1] not in param_values_list:
+                param_values_list.append(query[1])
+        else:
+            query = query[1::2]
+            for param in query:
+                if param not in param_values_list:
+                    param_values_list.append(param)
+    param_values_list.sort()
+    return param_values_list
+
+
+def read_file(path_to_file):
+    print()
 
 
 def start_cli_parser():
@@ -142,9 +207,7 @@ def start_cli_parser():
         description="Take a list of URLs or a Burp Suite XML file as input and get a list of: directories, files, parameters names, parameters values and links."
     )
     parser.add_argument(
-        "filename",
-        type=str,
-        help="Path to the URLs list or to the Burp Suite XML file.",
+        "-u", "--url", help="Path to the URLs list or to the Burp Suite XML file."
     )
     parser.add_argument(
         "-d",
@@ -169,12 +232,19 @@ def start_cli_parser():
     )
     parser.add_argument(
         "--no-numbers",
-        help="Exclude results that contain numbers.",
-        choices=["dirs", "files", "param-names", "param-values"],
+        help="Exclude results that contain numbers. Accepted values: dirs, files, param-names, param-values",
+        nargs="*",
     )
     parser.add_argument(
         "--nonprintable",
-        help="Exclude results that contain nonprintable characters.",
+        help="Include results that contain nonprintable characters.",
+        action="store_false",
+    )
+    parser.add_argument(
+        "--all-files",
+        # di default off ma immagino che tutti vogliano vedere "all kind of files..."
+        # forse meglio di default visualizzarli tutti e aggiungere un "filter most common"
+        help="Include results that contain all kind of files.",
         action="store_false",
     )
 
@@ -194,28 +264,48 @@ def wordstree():
     args = vars(parser.parse_args())
 
     try:
-        if os.stat(args["filename"]).st_size == 0:
-            sys.exit("The file is empty.")
-        print("Parsing ", args["filename"], "...")
-        if args["directories"]:
-            directories_list = get_directories(args["filename"])
-        if args["files"]:
-            files_list = get_files(args["filename"])
-        
-
+        if not args["url"]:
+            parser.print_help()
+            sys.exit()
+        else:
+            if os.stat(args["url"]).st_size == 0:
+                sys.exit("The file is empty.")
+            with open((args["url"]), encoding="utf 8") as f:
+                print("Parsing ", args["url"], "...")
+                read_data = f.read()
+                if args["directories"]:
+                    directories_list = get_directories(read_data)
+                if args["files"]:
+                    files_list = get_files(read_data)
+                if args["param_names"]:
+                    param_names_list = get_param_names(read_data)
+                if args["param_values"]:
+                    param_values_list = get_param_values(read_data)
     except FileNotFoundError:
         sys.exit("No such file or directory.")
     else:
-        if args["no_numbers"] == "dirs":
-            directories_list = remove_numbers(directories_list)
+        if args["no_numbers"]:
+            if "dirs" in args["no_numbers"]:
+                directories_list = remove_numbers(directories_list)
+            if "files" in args["no_numbers"]:
+                files_list = remove_numbers(files_list)
+            if "param-names" in args["no_numbers"]:
+                param_names_list = remove_numbers(param_names_list)
+            if "param-values" in args["no_numbers"]:
+                param_values_list = remove_numbers(param_values_list)
         if args["nonprintable"]:
             directories_list = remove_nonprintable_chars(directories_list)
-        current, peak = tracemalloc.get_traced_memory()
-        
-        
-        
+            files_list = remove_nonprintable_chars(files_list)
+            param_names_list = remove_nonprintable_chars(param_names_list)
+            param_values_list = remove_nonprintable_chars(param_values_list)
+        if args["all_files"]:
+            files_list = show_all_files(files_list)
+
         wordlist["directories"] = directories_list
-        wordlist["files"] = files_list
+        wordlist["file"] = files_list
+        wordlist["param names"] = param_names_list
+        wordlist["param values"] = param_values_list
+
         print_result(wordlist)
 
         current, peak = tracemalloc.get_traced_memory()
