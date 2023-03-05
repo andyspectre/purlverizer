@@ -2,8 +2,10 @@ test_burp_output
 *.pyc
 launch.json
 .$Untitled Diagram.drawio.bkp
+burp_out_expedia.it_base64
 burp_output_sitemap_complete
 burp_output_small
+elements.txt
 empty_file.txt
 febino.JPG
 html_test.html

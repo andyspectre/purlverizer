@@ -1,7 +1,7 @@
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-def get_directories(read_data):
+def get_directories(url_list):
     """
     description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories
     parameters:
@@ -10,7 +10,7 @@ def get_directories(read_data):
     """
     directories_list = []
 
-    for url in read_data.split("\n"):
+    for url in url_list:
         words = urlparse(url).path.split("/")
         for word in words:
             # Non sono sicuro se voglio decodificare o no. Per decodificare, uncommentare la riga sotto.
@@ -22,7 +22,7 @@ def get_directories(read_data):
     return directories_list
 
 
-def get_files(read_data):
+def get_files(url_list):
     """
     description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories.
     parameters:
@@ -30,7 +30,7 @@ def get_files(read_data):
     return: a list of strings (filenames)
     """
     files_list = []
-    for url in read_data.split("\n"):
+    for url in url_list:
         # word = unquote(Path(urlparse(url).path).name) -> non sono sicuro se voglio decodificare o no
         word = Path(urlparse(url).path).name
         if word not in files_list and word != "" and "." in word:
@@ -39,9 +39,9 @@ def get_files(read_data):
     return files_list
 
 
-def get_param_names(read_data):
+def get_param_names(url_list):
     param_names_list = []
-    for url in read_data.split("\n"):
+    for url in url_list:
         query = urlparse(url).query.replace("=", "&").split("&")
         if query[0] == "":
             pass
@@ -57,9 +57,9 @@ def get_param_names(read_data):
     return param_names_list
 
 
-def get_param_values(read_data):  
+def get_param_values(url_list):  
     param_values_list = []
-    for url in read_data.split("\n"):
+    for url in url_list:
         query = urlparse(url).query.replace("=", "&").split("&")
         if query[0] == "":
             pass

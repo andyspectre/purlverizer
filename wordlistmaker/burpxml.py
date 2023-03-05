@@ -1,6 +1,9 @@
+import base64
+import tracemalloc
 import urllist
 import xml.etree.ElementTree as ET
 
+tracemalloc.start()
 
 def get_directories(burpfile):
     """
@@ -9,47 +12,27 @@ def get_directories(burpfile):
         filename: a Burp Suite XML file or a txt file with a list of URLs
     return: a list of strings (filenames)
     """
+    url_list = []
     directories_list = []
+    n = 0
     try:
-        for event, elem in ET.iterparse(burpfile, events=("start", "end")):
+        for event, elem in ET.iterparse(burpfile, events=("start","end")):
             if event == "start":
-                if elem.tag == "url":
-                    if elem.text =="GET":
-                        directories_list.append(elem.text)    
+                continue
+            if event == "end" and elem.tag == "url":
+                if elem.text not in url_list:
+                    url_list.append(elem.text)
+                
+            if event == "end" and elem.tag == "item":
+                n += 1
+            elem.clear()
+        print("Reached the end", n, "times.")
+        directories_list = urllist.get_directories(url_list)
+
+        current, peak = tracemalloc.get_traced_memory()
+        print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+        tracemalloc.stop()
+
     except ET.ParseError as err:
         print(err)
     return directories_list
-
-    # try:
-    #     with open(filename, encoding="utf 8") as f:
-    #         tree = ET.parse(f)
-    #         files = []
-    #         for tag in tree.iter():
-    #             # get file from url
-    #             if tag.tag == "url":
-    #                 words = urlparse(tag.text)
-    #                 if Path(words.path).suffix:
-    #                     if (
-    #                         unquote(Path(words.path).name) not in files
-    #                         and unquote(Path(words.path).name) != ""
-    #                     ):
-    #                         files.append(unquote(Path(words.path).name))
-    # except UnicodeDecodeError:
-    #     sys.exit("Can't decode the content of the file.")
-    # except ET.ParseError:
-    #     raise
-
-    # def get_directories(read_data):
-    
-    # directories_list = []
-
-    # for url in read_data.split("\n"):
-    #     words = urlparse(url).path.split("/")
-    #     for word in words:
-    #         # Non sono sicuro se voglio decodificare o no. Per decodificare, uncommentare la riga sotto.
-    #         # word = unquote(word)
-
-    #         if word not in directories_list and word != "" and "." not in word:
-    #             directories_list.append(word)
-    # directories_list.sort()
-    # return directories_list

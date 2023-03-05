@@ -8,7 +8,7 @@ import filters
 import output
 import urllist
 
-tracemalloc.start()
+
 
 def wordstree():
     """Takes input from the cli, pass it to the parsing functions and then returns
@@ -33,16 +33,19 @@ def wordstree():
             if os.stat(args["url"]).st_size == 0:
                     sys.exit("The file is empty.")
             with open((args["url"]), encoding="utf 8") as f:
-                print("Parsing ", args["url"], "...")
-                read_data = f.read()
+                url_list = []
+                print("Parsing ", args["url"], "...")        
+                for line in f:
+                    url = line.strip()
+                    url_list.append(url)
                 if args["directories"]:
-                    directories_list = urllist.get_directories(read_data)
+                    directories_list = urllist.get_directories(url_list)
                 if args["files"]:
-                    files_list = urllist.get_files(read_data)
+                    files_list = urllist.get_files(url_list)
                 if args["param_names"]:
-                    param_names_list = urllist.get_param_names(read_data)
+                    param_names_list = urllist.get_param_names(url_list)
                 if args["param_values"]:
-                    param_values_list = urllist.et_param_values(read_data)
+                    param_values_list = urllist.et_param_values(url_list)
                 if args["no_numbers"]:
                     if "dirs" in args["no_numbers"]:
                         directories_list = filters.remove_numbers(directories_list)
@@ -64,7 +67,7 @@ def wordstree():
             sys.exit()
     except FileNotFoundError:
         sys.exit("No such file or directory.")
-        
+
     wordlist["directories"] = directories_list
     wordlist["file"] = files_list
     wordlist["param names"] = param_names_list
@@ -72,6 +75,3 @@ def wordstree():
 
     output.print_result(wordlist)
 
-    current, peak = tracemalloc.get_traced_memory()
-    print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
-    tracemalloc.stop()
