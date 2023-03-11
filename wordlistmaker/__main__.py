@@ -1,3 +1,3 @@
-from wordlistmaker import wordstree
+from wordlistmaker import main
 
-wordstree()
+main()

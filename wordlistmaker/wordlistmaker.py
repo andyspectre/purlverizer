@@ -10,7 +10,7 @@ import urllist
 
 
 
-def wordstree():
+def main():
     """Takes input from the cli, pass it to the parsing functions and then returns
     the wordlist.
     """
