@@ -5,12 +5,14 @@ launch.json
 burp_out_expedia.it_base64
 burp_output_sitemap_complete
 burp_output_small
+burp_output_test
 elements.txt
 empty_file.txt
 febino.JPG
 html_test.html
 test.docx
 test_python.py
+tlds.txt
 Untitled Diagram.drawio
 urls_list_full.txt
 urls_list_small.txt
