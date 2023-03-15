@@ -1573,6 +1573,7 @@ def print_result(wordlist):
         for i in v:
             print(i)
 
+
 def check_url(url_list):
     urls = dict()
 
@@ -1645,7 +1646,8 @@ def parse_burp_file(burpfile):
                             ):
                                 url_list.append(url)
                             elif (
-                                Path(urlparse(url).path).suffix == ".js" or Path(urlparse(url).netloc).suffix == ".js"
+                                Path(urlparse(url).path).suffix == ".js"
+                                or Path(urlparse(url).netloc).suffix == ".js"
                                 and url not in js_files
                             ):
                                 js_files.append(url)
@@ -1657,14 +1659,20 @@ def parse_burp_file(burpfile):
                         urls_in_jsonparse = URLS.findall(url)
 
                     for url in urls_in_jsonparse:
-                        if (Path(urlparse(url).path).suffix != ".js" and url not in url_list):
+                        if (
+                            Path(urlparse(url).path).suffix != ".js"
+                            and url not in url_list
+                        ):
                             url_list.append(url)
                         elif (
-                            Path(urlparse(url).path).suffix == ".js" and url not in js_files
-                            ):
+                            Path(urlparse(url).path).suffix == ".js"
+                            and url not in js_files
+                        ):
                             js_files.append(url)
             elif elem.tag == "response" and elem.attrib["base64"] == "false":
-                print("Make sure to select \"Base64-encode requests and responses\" when saving the items from Burp Suite Site map.")
+                print(
+                    'Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
+                )
             if elem.tag == "item":
                 n += 1
             elem.clear()
@@ -1672,7 +1680,7 @@ def parse_burp_file(burpfile):
 
     except ET.ParseError as err:
         print(err)
-    
+
     urls_found["urls"] = url_list
     urls_found["javascript files"] = js_files
     return urls_found
