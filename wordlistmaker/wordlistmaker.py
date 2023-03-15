@@ -18,17 +18,6 @@ from urllib.parse import unquote, urlparse
 
 tracemalloc.start()
 
-
-def print_result(wordlist):
-    # print(wordlist)
-    for k, v in wordlist.items():
-        print("--------")
-        print(k, ":", len(v))
-        print("--------")
-        for i in v:
-            print(i)
-
-
 COMMON_EXTENSIONS = [
     ".asp",
     ".aspx",
@@ -73,8 +62,6 @@ COMMON_EXTENSIONS = [
     ".txt",
     ".xml",
 ]
-
-
 TLD = [
     ".aaa",
     ".aarp",
@@ -1558,7 +1545,6 @@ TLD = [
     ".zuerich",
     ".zw",
 ]
-
 CHARS = [".", " ", "<", ">", "+", "*", ";", ":", '"', "{", "}", "|", "^", "`", "#"]
 
 # regex_str = r"""
@@ -1566,45 +1552,26 @@ CHARS = [".", " ", "<", ">", "+", "*", ";", ":", '"', "{", "}", "|", "^", "`", "
 # """
 
 FIND_URLS = r"""(?i)\b((?:https?:(?:/{1,3}|[a-z0-9%])|[a-z0-9.\-]+[.](?:com|net|org|edu|gov|mil|aero|asia|biz|cat|coop|info|int|jobs|mobi|museum|name|post|pro|tel|travel|xxx|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cs|cu|cv|cx|cy|cz|dd|de|dj|dk|dm|do|dz|ec|ee|eg|eh|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|Ja|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw)/)(?:[^\s"()<>{}\[\]]+|\([^\s()]*?\([^\s()]+\)[^\s()]*?\)|\([^\s]+?\))+(?:\([^\s()]*?\([^\s()]+\)[^\s()]*?\)|\([^\s]+?\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’])|(?:(?<!@)[a-z0-9]+(?:[.\-][a-z0-9]+)*[.](?:com|net|org|edu|gov|mil|aero|asia|biz|cat|coop|info|int|jobs|mobi|museum|name|post|pro|tel|travel|xxx|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cs|cu|cv|cx|cy|cz|dd|de|dj|dk|dm|do|dz|ec|ee|eg|eh|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|Ja|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw)\b/?(?!@)))"""
-
-URLS = re.compile(FIND_URLS, re.VERBOSE)
+URLS = re.compile(FIND_URLS)
 
 # JSON = r"JSON\.parse(\(\"{.*?}\"\))|JSON.parse(\(\".*?\"\))"
-FIND_JSON = r"JSON\.parse(\(\".+\"\);)"
+MATCH_JSON_PARSE = r"JSON\.parse(\(\".+\"\);)"
+JSON_PARSE = re.compile(MATCH_JSON_PARSE)
 
-JSON = re.compile(FIND_JSON)
-
-
-# regex_str = r"""                               # Start newline delimiter
-#   (
-#     ((?:[a-zA-Z]{1,10}://|//)           # Match a scheme [a-Z]*1-10 or //
-#     [^"'/]{1,}\.                        # Match a domainname (any character + dot)
-#     [a-zA-Z]{2,}[^"']{0,})              # The domainextension and/or path
-#     |
-#     ((?:/|\.\./|\./)                    # Start with /,../,./
-#     [^"'><,;| *()(%%$^/\\\[\]]          # Next character can't be...
-#     [^"'><,;|()]{1,})                   # Rest of the characters can't be
-#     |
-#     ([a-zA-Z0-9_\-/]{1,}/               # Relative endpoint with /
-#     [a-zA-Z0-9_\-/]{1,}                 # Resource name
-#     \.(?:[a-zA-Z]{1,4}|action)          # Rest + extension (length 1-4 or action)
-#     (?:[\?|#][^"|']{0,}|))              # ? or # mark with parameters
-#     |
-#     ([a-zA-Z0-9_\-/]{1,}/               # REST API (no extension) with /
-#     [a-zA-Z0-9_\-/]{3,}                 # Proper REST endpoints usually have 3+ chars
-#     (?:[\?|#][^"|']{0,}|))              # ? or # mark with parameters
-#     |
-#     ([a-zA-Z0-9_\-]{1,}                 # filename
-#     \.(?:php|asp|aspx|jsp|json|
-#          action|html|js|txt|xml)        # . + extension
-#     (?:[\?|#][^"|']{0,}|))              # ? or # mark with parameters
-#   )                             # End newline delimiter
-# """
 proxies = {"http": "http://127.0.0.1:8080", "https": "http://127.0.0.1:8080"}
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
+def print_result(wordlist):
+    # print(wordlist)
+    for k, v in wordlist.items():
+        print("--------")
+        print(k, ":", len(v))
+        print("--------")
+        for i in v:
+            print(i)
 
 def check_url(url_list):
     urls = dict()
@@ -1665,13 +1632,17 @@ def parse_burp_file(burpfile):
                 elem.text = str(base64.b64decode(elem.text))
                 # print(elem.text)
                 if html:
-                    urls = URLS.findall(elem.text)
-                    # for group in urls:
-                    #     for url in group:
-                    #         if url not in url_list and url != '':
-                    #             url_list.append(url)
-                    for url in urls:
-                        # print(Path(urlparse(url).path).suffix)
+                    raw_urls = URLS.findall(elem.text)
+                    for url in raw_urls:
+                        url = url.replace("\\", "\\\\")
+                        url.encode().decode("unicode-escape")
+                        
+                        
+                #     # for group in urls:
+                #     #     for url in group:
+                #     #         if url not in url_list and url != '':
+                #     #             url_list.append(url)
+                #     
                         if (
                             Path(urlparse(url).path).suffix in TLD
                             or Path(urlparse(url).netloc).suffix in TLD
@@ -1684,31 +1655,32 @@ def parse_burp_file(burpfile):
                                 url
                             ).path.startswith("."):
                                 url = "https://www" + url
-                            if (
+                            elif (
                                 Path(urlparse(url).path).suffix != ".js"
                                 and url not in url_list
                             ):
                                 url_list.append(url)
                             elif (
-                                Path(urlparse(url).path).suffix == ".js"
+                                Path(urlparse(url).path).suffix == ".js" or Path(urlparse(url).netloc).suffix == ".js"
                                 and url not in js_files
                             ):
                                 js_files.append(url)
 
-                    json_obj = JSON.findall(elem.text)
-                    # print(json_obj)
-                    json_obj = [e.encode().decode("unicode-escape") for e in json_obj]
-                    # print(json_obj)
-                    # json_obj = [e.encode().decode("unicode-escape") for e in json_obj]
-                    # print(json_obj)
+                    jsonparse = JSON_PARSE.findall(elem.text)
+                    print(jsonparse)
+                    json_parse_data = [j.encode().decode("unicode-escape").encode().decode("unicode-escape").encode().decode("unicode-escape") for j in jsonparse]
                     urls_in_jsonparse = []
 
-                    for t in json_obj:
+                    for t in json_parse_data:
                         urls_in_jsonparse = URLS.findall(t)
 
                     for url in urls_in_jsonparse:
-                        if url not in url_list:
+                        if (Path(urlparse(url).path).suffix != ".js" and url not in url_list):
                             url_list.append(url)
+                        elif (
+                                Path(urlparse(url).path).suffix == ".js" and url not in js_files
+                            ):
+                                js_files.append(url)
             elif elem.tag == "response" and elem.attrib["base64"] == "false":
                 if html:
                     urls = URLS.findall(elem.text)
@@ -1741,7 +1713,7 @@ def parse_burp_file(burpfile):
                             ):
                                 js_files.append(url)
 
-                    json_obj = JSON.findall(elem.text)
+                    json_obj = JSON_PARSE.findall(elem.text)
                     # print(json_obj)
                     json_obj = [e.encode().decode("unicode-escape") for e in json_obj]
                     # print(json_obj)
