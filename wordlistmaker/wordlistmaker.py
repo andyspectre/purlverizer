@@ -1610,14 +1610,8 @@ def parse_burp_file(burpfile):
     return: a list of strings (filenames)
     """
     url_list = []
-    json_obj_list = []
-    not_real_urls = []
     js_files = []
-    directories_list = []
-    url_n = 0
-    js_n = 0
     urls_found = dict()
-
     html = False
     n = 0
     try:
@@ -1669,94 +1663,12 @@ def parse_burp_file(burpfile):
                             Path(urlparse(url).path).suffix == ".js" and url not in js_files
                             ):
                             js_files.append(url)
-                    
             elif elem.tag == "response" and elem.attrib["base64"] == "false":
-                if html:
-                    urls = URLS.findall(elem.text)
-                    # for group in urls:
-                    #     for url in group:
-                    #         if url not in url_list and url != '':
-                    #             url_list.append(url)
-                    for url in urls:
-                        # print(Path(urlparse(url).path).suffix)
-                        if (
-                            Path(urlparse(url).path).suffix in TLD
-                            or Path(urlparse(url).netloc).suffix in TLD
-                        ):
-                            if urlparse(url).scheme == "" and not urlparse(
-                                url
-                            ).path.startswith("."):
-                                url = "https://" + url
-                            elif urlparse(url).scheme == "" and urlparse(
-                                url
-                            ).path.startswith("."):
-                                url = "https://www" + url
-                            if (
-                                Path(urlparse(url).path).suffix != ".js"
-                                and url not in url_list
-                            ):
-                                url_list.append(url)
-                            elif (
-                                Path(urlparse(url).path).suffix == ".js"
-                                and url not in js_files
-                            ):
-                                js_files.append(url)
-
-                    json_obj = JSON_PARSE.findall(elem.text)
-                    # print(json_obj)
-                    json_obj = [e.encode().decode("unicode-escape") for e in json_obj]
-                    # print(json_obj)
-                    json_obj = [e.encode().decode("unicode-escape") for e in json_obj]
-                    # print(json_obj)
-                    urls_in_jsonparse = []
-
-                    for t in json_obj:
-                        urls_in_jsonparse = URLS.findall(t)
-
-                    for url in urls_in_jsonparse:
-                        if url not in url_list:
-                            url_list.append(url)
-
-                    #     o = o.encode('utf-8')
-                    # print(json_obj)
-                    # json_obj = ' '.join([str(elem) for elem in json_obj])
-
-                    # print(json.loads(json_obj))
-                    # print(json_obj)
-                    # elif Path(urlparse(url).path).suffix not in TLD or Path(urlparse(url).netloc).suffix not in TLD:
-                    #     if Path(urlparse(url).path).suffix != '' and url not in not_real_urls:
-                    #         not_real_urls.append(url)
-
+                print("Make sure to select \"Base64-encode requests and responses\" when saving the items from Burp Suite Site map.")
             if elem.tag == "item":
                 n += 1
             elem.clear()
         print("Reached the end", n, "times.")
-
-        # print("Real URLs:", len(url_list))
-        # for url in url_list:
-        # urls_found = check_url(url_list)
-
-        # for status, url_list in urls_found.items():
-        #     print(status)
-        #     for url in url_list:
-        #         print(url)
-        # for char in url:
-        #     if char in CHARS:
-        #         char = quote(char)
-        #     print(url)
-        # print()
-        # print("------------------------")
-        # print("JS files:", len(js_files))
-        # print("------------------------")
-        # for js in js_files:
-        #     print(js)
-        # print()
-        # print("------------------------")
-        # print("Not real URLs")
-        # print("------------------------")
-        # for url in not_real_urls:
-        #     print(url)
-        # directories_list = get_directories(url_list)
 
     except ET.ParseError as err:
         print(err)
