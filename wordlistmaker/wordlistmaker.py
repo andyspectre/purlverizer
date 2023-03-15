@@ -1630,19 +1630,9 @@ def parse_burp_file(burpfile):
                 html = True
             if elem.tag == "response" and elem.attrib["base64"] == "true":
                 elem.text = str(base64.b64decode(elem.text))
-                # print(elem.text)
                 if html:
                     raw_urls = URLS.findall(elem.text)
                     for url in raw_urls:
-                        url = url.replace("\\", "\\\\")
-                        url.encode().decode("unicode-escape")
-                        
-                        
-                #     # for group in urls:
-                #     #     for url in group:
-                #     #         if url not in url_list and url != '':
-                #     #             url_list.append(url)
-                #     
                         if (
                             Path(urlparse(url).path).suffix in TLD
                             or Path(urlparse(url).netloc).suffix in TLD
@@ -1667,20 +1657,19 @@ def parse_burp_file(burpfile):
                                 js_files.append(url)
 
                     jsonparse = JSON_PARSE.findall(elem.text)
-                    print(jsonparse)
-                    json_parse_data = [j.encode().decode("unicode-escape").encode().decode("unicode-escape").encode().decode("unicode-escape") for j in jsonparse]
                     urls_in_jsonparse = []
 
-                    for t in json_parse_data:
-                        urls_in_jsonparse = URLS.findall(t)
+                    for url in jsonparse:
+                        urls_in_jsonparse = URLS.findall(url)
 
                     for url in urls_in_jsonparse:
                         if (Path(urlparse(url).path).suffix != ".js" and url not in url_list):
                             url_list.append(url)
                         elif (
-                                Path(urlparse(url).path).suffix == ".js" and url not in js_files
+                            Path(urlparse(url).path).suffix == ".js" and url not in js_files
                             ):
-                                js_files.append(url)
+                            js_files.append(url)
+                    
             elif elem.tag == "response" and elem.attrib["base64"] == "false":
                 if html:
                     urls = URLS.findall(elem.text)
@@ -1771,9 +1760,13 @@ def parse_burp_file(burpfile):
 
     except ET.ParseError as err:
         print(err)
+    
     urls_found["urls"] = url_list
     urls_found["javascript files"] = js_files
     return urls_found
+    # with open('urls_test_list.txt', 'w') as filehandle:
+    #     for url in urls_found["urls"]:
+    #         filehandle.writelines(f"{url}\n")
 
 
 def show_all_files(files_list):
