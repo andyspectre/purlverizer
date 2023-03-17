@@ -167,6 +167,11 @@ COMMON_TLD = [
     ".ms",
     ".sa",
     ".app",
+    ".asia",
+    ".ec",
+    ".lk",
+    ".uy",
+    ".dev"
 ]
 URLS = re.compile(FIND_URLS)
 JSON_PARSE = re.compile(r"JSON\.parse(\(\".+\"\);)")
@@ -230,10 +235,6 @@ def parse_burp_file(burpfile):
                 elem.text = unquote(elem.text)
                 urls = URLS.findall(elem.text)
                 for url in urls:
-                    # if (
-                    #     Path(urlparse(url).path).suffix in TLD
-                    #     or Path(urlparse(url).netloc).suffix in TLD
-                    # ):
                     if urlparse(url).scheme == "" and not urlparse(url).path.startswith(
                         "."
                     ):
@@ -262,11 +263,12 @@ def parse_burp_file(burpfile):
 
                 for url in urls:
                     # if ((len(Path(urlparse(url).path).stem) == 1) or
-                    if (
+                    if len(Path(urlparse(url).path).stem) == 1:
+                        pass
+                    elif (
                         (
                             Path(urlparse(url).path).suffix not in COMMON_TLD
                             and Path(urlparse(url).netloc).suffix not in COMMON_TLD
-                            or len(Path(urlparse(url).path).stem) == 1
                         )
                         and Path(urlparse(url).path).suffix != ".js"
                         and Path(urlparse(url).path).suffix != ".map"
@@ -281,8 +283,8 @@ def parse_burp_file(burpfile):
                     ):
                         url_list.append(url)
                     elif (
-                        Path(urlparse(url).path).suffix == ".js"
-                        or Path(urlparse(url).path).suffix == ".map"
+                        (Path(urlparse(url).path).suffix == ".js"
+                        or Path(urlparse(url).path).suffix == ".map")
                         and url not in js_files
                         and url not in false_positives
                     ):
