@@ -1,4 +1,5 @@
 import argparse
+import html
 import os
 import sys
 import tracemalloc
@@ -171,7 +172,7 @@ COMMON_TLD = [
     ".ec",
     ".lk",
     ".uy",
-    ".dev"
+    ".dev",
 ]
 URLS = re.compile(FIND_URLS)
 JSON_PARSE = re.compile(r"JSON\.parse(\(\".+\"\);)")
@@ -223,8 +224,6 @@ def parse_burp_file(burpfile):
     js_files = []
     false_positives = []
     urls_found = dict()
-    html = False
-    json = False
     n = 0
     try:
         for event, elem in ET.iterparse(burpfile):
@@ -235,15 +234,7 @@ def parse_burp_file(burpfile):
                 elem.text = unquote(elem.text)
                 urls = URLS.findall(elem.text)
                 for url in urls:
-                    if urlparse(url).scheme == "" and not urlparse(url).path.startswith(
-                        "."
-                    ):
-                        url = "https://" + url
-                    elif urlparse(url).scheme == "" and urlparse(url).path.startswith(
-                        "."
-                    ):
-                        url = "https://www" + url
-                    elif (
+                    if (
                         Path(urlparse(url).path).suffix != ".js"
                         and Path(urlparse(url).path).suffix != ".map"
                         and url not in url_list
@@ -255,14 +246,14 @@ def parse_burp_file(burpfile):
                         and url not in js_files
                     ):
                         js_files.append(url)
-
             if elem.tag == "response" and elem.attrib["base64"] == "true":
                 elem.text = str(base64.b64decode(elem.text))
+                elem.text = unquote(elem.text)
+                elem.text = html.unescape(elem.text)
                 elem.text = elem.text.replace("\\", "").replace("u002F", "/")
                 urls = URLS.findall(elem.text)
 
                 for url in urls:
-                    # if ((len(Path(urlparse(url).path).stem) == 1) or
                     if len(Path(urlparse(url).path).stem) == 1:
                         pass
                     elif (
@@ -276,20 +267,18 @@ def parse_burp_file(burpfile):
                     ):
                         false_positives.append(url)
                     elif (
-                        Path(urlparse(url).path).suffix != ".js"
-                        and Path(urlparse(url).path).suffix != ".map"
-                        and url not in url_list
+                        (
+                            Path(urlparse(url).path).suffix == ".js"
+                            or Path(urlparse(url).path).suffix == ".map"
+                        )
+                        and url not in js_files
+                    ):
+                        js_files.append(url)
+                    elif (
+                        url not in url_list
                         and url not in false_positives
                     ):
                         url_list.append(url)
-                    elif (
-                        (Path(urlparse(url).path).suffix == ".js"
-                        or Path(urlparse(url).path).suffix == ".map")
-                        and url not in js_files
-                        and url not in false_positives
-                    ):
-                        js_files.append(url)
-
             elif elem.tag == "response" and elem.attrib["base64"] == "false":
                 print(
                     'Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
@@ -302,6 +291,9 @@ def parse_burp_file(burpfile):
     except ET.ParseError as err:
         print(err)
 
+    url_list.sort()
+    js_files.sort()
+    false_positives.sort()
     urls_found["urls"] = url_list
     urls_found["javascript files"] = js_files
     urls_found["probably false positives"] = false_positives
@@ -425,7 +417,7 @@ def command_line_parser():
         description="Take a list of URLs or a Burp Suite XML file as input and get a list of: directories, files, parameters names, parameters values and links."
     )
     parser.add_argument("-u", "--url", help="Path to a list of URLs.")
-    parser.add_argument("-x", "--xml", help="Path to a Burp XML file.")
+    parser.add_argument("-b", "--burp-file", help="Path to a Burp XML file.")
     parser.add_argument(
         "-l",
         "--list-of-urls",
@@ -470,6 +462,10 @@ def command_line_parser():
         help="Include results that contain all kind of files.",
         action="store_false",
     )
+    parser.add_argument("-is", "--in-scope", help="in-scope domains", nargs="*")
+    parser.add_argument("-os", "--out-scope", help="out-scope domains", nargs="*")
+    parser.add_argument("-o", "--output", help="Output file name.")
+    parser.add_argument("-e", "--endpoints", help="find all endpoints from the Burp file", action="store_true")
 
     return parser
 
@@ -490,10 +486,15 @@ def main():
     args = vars(parser.parse_args())
 
     try:
-        if args["xml"]:
-            if os.stat(args["xml"]).st_size == 0:
+        if args["burp_file"]:
+            if os.stat(args["burp_file"]).st_size == 0:
                 sys.exit("The file is empty.")
-            burp_request_response = parse_burp_file(args["xml"])
+            if args["endpoints"]:
+                endpoints = parse_burp_file(args["burp_file"])
+            if args["directories"]:
+                if args["endpoints"]:
+                    directories_list = get_directories(endpoints["urls"])
+            
 
         elif args["url"]:
             if os.stat(args["url"]).st_size == 0:
@@ -538,7 +539,8 @@ def main():
     wordlist["file"] = files_list
     wordlist["param names"] = param_names_list
     wordlist["param values"] = param_values_list
-    for url, li in burp_request_response.items():
+
+    for url, li in endpoints.items():
         wordlist[url] = li
 
     print_result(wordlist)
