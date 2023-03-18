@@ -290,61 +290,6 @@ def parse_burp_file(burpfile):
                     ):
                         js_files.append(url)
 
-                    # if (
-                    #     Path(urlparse(url).path).suffix in TLD
-                    #     or Path(urlparse(url).netloc).suffix in TLD
-                    # ):
-                    #     if urlparse(url).scheme == "" and not urlparse(
-                    #         url
-                    #     ).path.startswith("."):
-                    #         url = "https://" + url
-                    #     elif urlparse(url).scheme == "" and urlparse(
-                    #         url
-                    #     ).path.startswith("."):
-                    #         url = "https://www" + url
-                    #     elif (
-                    #         Path(urlparse(url).path).suffix != ".js"
-                    #         and url not in url_list
-                    #     ):
-                    #         url_list.append(url)
-                    #     elif (
-                    #         Path(urlparse(url).path).suffix == ".js"
-                    #         and url not in js_files
-                    #     ):
-                    #         js_files.append(url)
-
-                # jsonparse = JSON_PARSE.findall(elem.text)
-                # decoded = ""
-                # for data in jsonparse:
-                #     decoded = data.encode().decode("unicode-escape")
-                # urls_in_jsonparse = URLS.findall(decoded)
-                # for urlmatch in urls_in_jsonparse:
-                #     if (
-                #         Path(urlparse(urlmatch).path).suffix != ".js"
-                #         and urlmatch not in url_list
-                #     ):
-                #         url_list.append(urlmatch)
-                #     elif (
-                #         Path(urlparse(urlmatch).path).suffix == ".js"
-                #         and urlmatch not in js_files
-                #     ):
-                #         js_files.append(urlmatch)
-                # print(elem.text)
-                # host_only_in_js = HOST_ESCAPED_TLD.findall(elem.text)
-
-                # hosts_in_js = []
-                # for host_tld in host_only_in_js:
-                #     if (
-                #         Path(urlparse(host_tld).path).suffix != ".js"
-                #         and host_tld not in url_list
-                #     ):
-                #         url_list.append(host_tld)
-                #     elif (
-                #         Path(urlparse(host_tld).path).suffix == ".js"
-                #         and host_tld not in js_files
-                #     ):
-                #         js_files.append(host_tld)
-
             elif elem.tag == "response" and elem.attrib["base64"] == "false":
                 print(
                     'Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
