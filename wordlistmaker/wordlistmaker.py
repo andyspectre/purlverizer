@@ -475,6 +475,7 @@ def main():
     the wordlist.
     """
     wordlist = dict()
+    endpoints = dict()
     directories_list = []
     files_list = []
     param_names_list = []
@@ -494,6 +495,8 @@ def main():
             if args["directories"]:
                 if args["endpoints"]:
                     directories_list = get_directories(endpoints["urls"])
+                else:
+                    directories_list = get_directories(parse_burp_file(args["burp_file"])["urls"])
             
 
         elif args["url"]:
