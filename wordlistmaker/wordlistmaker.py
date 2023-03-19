@@ -175,8 +175,8 @@ COMMON_TLD = [
     ".dev",
 ]
 URLS = re.compile(FIND_URLS)
-JSON_PARSE = re.compile(r"JSON\.parse(\(\".+\"\);)")
-TEXT_PLAIN = re.compile(r"Content-Type: text/plain")
+# JSON_PARSE = re.compile(r"JSON\.parse(\(\".+\"\);)")
+CONTENT_TYPE_JSON = re.compile(r"Content-Type: application/json")
 # HOST_ESCAPED_TLD = re.compile(r"[a-zA-Z0-9-]+\\.[a-zA-Z]{2,}\.?[a-zA-Z]{0,2}")
 
 proxies = {"http": "http://127.0.0.1:8080", "https": "http://127.0.0.1:8080"}
@@ -213,7 +213,53 @@ def check_url(url_list):
     return urls
 
 
-def parse_burp_file(burpfile):
+def get_all_keys(json_obj):
+    """
+    Recursively extract all keys from a nested JSON object
+    """
+    keys = set()
+    if isinstance(json_obj, dict):
+        for key, value in json_obj.items():
+            keys.add(key)
+            keys.update(get_all_keys(value))
+    elif isinstance(json_obj, list):
+        for item in json_obj:
+            keys.update(get_all_keys(item))
+    return keys
+
+
+def get_json_keys(burpfile):
+    """Find all the JSON keys inside a Burp Suite XML file"""
+    json_keys = set()
+    # Check the Content-Type inside the response. If it is application/json, then parse the JSON and extract all the keys.
+    try:
+        for event, elem in ET.iterparse(burpfile):
+            if elem.tag == "response" and elem.attrib["base64"] == "true":
+                elem.text = str(base64.b64decode(elem.text))
+                elem.text = unquote(elem.text)
+                elem.text = html.unescape(elem.text)
+                elem.text = elem.text.replace("\\", "").replace("u002F", "/")
+                if CONTENT_TYPE_JSON.search(elem.text):
+                    # split the response into headers and body
+                    headers, body = elem.text.split("rnrn", 1)
+                    # Remove any extra characters from the end of the body and load the JSON data
+                    last_brace_index = body.rfind("}")
+                    json_obj_str = body[: last_brace_index + 1]
+                    body = json.loads(json_obj_str)
+                    # Extract all the JSON keys from the body
+                    json_keys.update(get_all_keys(body))
+            elif elem.tag == "response" and elem.attrib["base64"] == "false":
+                print(
+                    'Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
+                )
+            if elem.tag == "item":
+                elem.clear()
+    except ET.ParseError as err:
+        print(err)
+    return json_keys
+
+
+def get_endpoints(burpfile):
     """
     description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories
     parameters:
@@ -223,7 +269,7 @@ def parse_burp_file(burpfile):
     url_list = []
     js_files = []
     false_positives = []
-    urls_found = dict()
+    endpoints_found = dict()
     n = 0
     try:
         for event, elem in ET.iterparse(burpfile):
@@ -267,17 +313,11 @@ def parse_burp_file(burpfile):
                     ):
                         false_positives.append(url)
                     elif (
-                        (
-                            Path(urlparse(url).path).suffix == ".js"
-                            or Path(urlparse(url).path).suffix == ".map"
-                        )
-                        and url not in js_files
-                    ):
+                        Path(urlparse(url).path).suffix == ".js"
+                        or Path(urlparse(url).path).suffix == ".map"
+                    ) and url not in js_files:
                         js_files.append(url)
-                    elif (
-                        url not in url_list
-                        and url not in false_positives
-                    ):
+                    elif url not in url_list and url not in false_positives:
                         url_list.append(url)
             elif elem.tag == "response" and elem.attrib["base64"] == "false":
                 print(
@@ -287,19 +327,18 @@ def parse_burp_file(burpfile):
                 n += 1
             elem.clear()
         print("Reached the end", n, "times.")
-
     except ET.ParseError as err:
         print(err)
 
     url_list.sort()
     js_files.sort()
     false_positives.sort()
-    urls_found["urls"] = url_list
-    urls_found["javascript files"] = js_files
-    urls_found["probably false positives"] = false_positives
-    return urls_found
+    endpoints_found["urls"] = url_list
+    endpoints_found["javascript files"] = js_files
+    endpoints_found["probably false positives"] = false_positives
+    return endpoints_found
     # with open('urls_test_list.txt', 'w') as filehandle:
-    #     for url in urls_found["urls"]:
+    #     for url in endpoints_found["urls"]:
     #         filehandle.writelines(f"{url}\n")
 
 
@@ -352,7 +391,6 @@ def get_directories(url_list):
         for word in words:
             # Non sono sicuro se voglio decodificare o no. Per decodificare, uncommentare la riga sotto.
             # word = unquote(word)
-
             if word not in directories_list and word != "" and "." not in word:
                 directories_list.append(word)
     directories_list.sort()
@@ -368,7 +406,8 @@ def get_files(url_list):
     """
     files_list = []
     for url in url_list:
-        # word = unquote(Path(urlparse(url).path).name) -> non sono sicuro se voglio decodificare o no
+        # Non sono sicuro se voglio decodificare o no. Per decodificare, uncommentare la riga sotto.
+        # word = unquote(Path(urlparse(url).path).name)
         word = Path(urlparse(url).path).name
         if word not in files_list and word != "" and "." in word:
             files_list.append(word)
@@ -401,12 +440,12 @@ def get_param_values(url_list):
         if query[0] == "":
             pass
         elif len(query) == 2:
-            if query[1] not in param_values_list:
+            if query[1] not in param_values_list and query[1] != "":
                 param_values_list.append(query[1])
         else:
             query = query[1::2]
             for param in query:
-                if param not in param_values_list:
+                if param not in param_values_list and param != "":
                     param_values_list.append(param)
     param_values_list.sort()
     return param_values_list
@@ -465,7 +504,15 @@ def command_line_parser():
     parser.add_argument("-is", "--in-scope", help="in-scope domains", nargs="*")
     parser.add_argument("-os", "--out-scope", help="out-scope domains", nargs="*")
     parser.add_argument("-o", "--output", help="Output file name.")
-    parser.add_argument("-e", "--endpoints", help="find all endpoints from the Burp file", action="store_true")
+    parser.add_argument(
+        "-e",
+        "--endpoints",
+        help="find all endpoints from the Burp file",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-jk", "--json-keys", help="find all json keys", action="store_true"
+    )
 
     return parser
 
@@ -477,12 +524,11 @@ def main():
     wordlist = dict()
     endpoints = dict()
     directories_list = []
+    url_list = []
     files_list = []
     param_names_list = []
     param_values_list = []
-    burp_request_response = []
-    javascript_files = []
-    # new_urls = []
+    json_keys = []
     parser = command_line_parser()
     args = vars(parser.parse_args())
 
@@ -491,57 +537,85 @@ def main():
             if os.stat(args["burp_file"]).st_size == 0:
                 sys.exit("The file is empty.")
             if args["endpoints"]:
-                endpoints = parse_burp_file(args["burp_file"])
-            if args["directories"]:
-                if args["endpoints"]:
-                    directories_list = get_directories(endpoints["urls"])
-                else:
-                    directories_list = get_directories(parse_burp_file(args["burp_file"])["urls"])
-            
-
+                print("Parsing ", args["burp_file"], "...")
+                endpoints = get_endpoints(args["burp_file"])
         elif args["url"]:
             if os.stat(args["url"]).st_size == 0:
                 sys.exit("The file is empty.")
             with open((args["url"]), encoding="utf 8") as f:
-                url_list = []
+
                 print("Parsing ", args["url"], "...")
                 for line in f:
                     url = line.strip()
                     url_list.append(url)
-                if args["directories"]:
-                    directories_list = get_directories(url_list)
-                if args["files"]:
-                    files_list = get_files(url_list)
-                if args["param_names"]:
-                    param_names_list = get_param_names(url_list)
-                if args["param_values"]:
-                    param_values_list = get_param_values(url_list)
-                if args["no_numbers"]:
-                    if "dirs" in args["no_numbers"]:
-                        directories_list = remove_numbers(directories_list)
-                    if "files" in args["no_numbers"]:
-                        files_list = remove_numbers(files_list)
-                    if "param-names" in args["no_numbers"]:
-                        param_names_list = remove_numbers(param_names_list)
-                    if "param-values" in args["no_numbers"]:
-                        param_values_list = remove_numbers(param_values_list)
-                if args["nonprintable"]:
-                    directories_list = remove_nonprintable_chars(directories_list)
-                    files_list = remove_nonprintable_chars(files_list)
-                    param_names_list = remove_nonprintable_chars(param_names_list)
-                    param_values_list = remove_nonprintable_chars(param_values_list)
-                if args["all_files"]:
-                    files_list = show_all_files(files_list)
         else:
             parser.print_help()
             sys.exit()
     except FileNotFoundError:
         sys.exit("No such file or directory.")
+    else:
+        if args["directories"]:
+            if args["burp_file"]:
+                if args["endpoints"]:
+                    directories_list = get_directories(endpoints["urls"])
+                else:
+                    directories_list = get_directories(
+                        get_endpoints(args["burp_file"])["urls"]
+                    )
+            if args["url"]:
+                directories_list = get_directories(url_list)
+        if args["files"]:
+            if args["burp_file"]:
+                if args["endpoints"]:
+                    files_list = get_files(endpoints["urls"])
+                else:
+                    files_list = get_files(get_endpoints(args["burp_file"])["urls"])
+            if args["url"]:
+                files_list = get_files(url_list)
+        if args["param_names"]:
+            if args["burp_file"]:
+                if args["endpoints"]:
+                    param_names_list = get_param_names(endpoints["urls"])
+                else:
+                    param_names_list = get_param_names(
+                        get_endpoints(args["burp_file"])["urls"]
+                    )
+            if args["url"]:
+                param_names_list = get_param_names(url_list)
+        if args["param_values"]:
+            if args["burp_file"]:
+                if args["endpoints"]:
+                    param_values_list = get_param_values(endpoints["urls"])
+                else:
+                    param_values_list = get_param_values(
+                        get_endpoints(args["burp_file"])["urls"]
+                    )
+                if args["url"]:
+                    param_values_list = get_param_values(url_list)
+        if args["no_numbers"]:
+            if "dirs" in args["no_numbers"]:
+                directories_list = remove_numbers(directories_list)
+            if "files" in args["no_numbers"]:
+                files_list = remove_numbers(files_list)
+            if "param-names" in args["no_numbers"]:
+                param_names_list = remove_numbers(param_names_list)
+            if "param-values" in args["no_numbers"]:
+                param_values_list = remove_numbers(param_values_list)
+        if args["nonprintable"]:
+            directories_list = remove_nonprintable_chars(directories_list)
+            files_list = remove_nonprintable_chars(files_list)
+            param_names_list = remove_nonprintable_chars(param_names_list)
+            param_values_list = remove_nonprintable_chars(param_values_list)
+        if args["all_files"]:
+            files_list = show_all_files(files_list)
+        if args["json_keys"]:
+            json_keys = get_json_keys(args["burp_file"])
 
     wordlist["directories"] = directories_list
     wordlist["file"] = files_list
     wordlist["param names"] = param_names_list
     wordlist["param values"] = param_values_list
+    wordlist["json keys"] = json_keys
 
     for url, li in endpoints.items():
         wordlist[url] = li
