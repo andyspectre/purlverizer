@@ -175,14 +175,7 @@ COMMON_TLD = [
     ".dev",
 ]
 URLS = re.compile(FIND_URLS)
-# JSON_PARSE = re.compile(r"JSON\.parse(\(\".+\"\);)")
 CONTENT_TYPE_JSON = re.compile(r"Content-Type: application/json")
-# HOST_ESCAPED_TLD = re.compile(r"[a-zA-Z0-9-]+\\.[a-zA-Z]{2,}\.?[a-zA-Z]{0,2}")
-
-proxies = {"http": "http://127.0.0.1:8080", "https": "http://127.0.0.1:8080"}
-
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def print_result(wordlist):
@@ -195,22 +188,14 @@ def print_result(wordlist):
             for i in v:
                 print(i)
 
-
-def check_url(url_list):
-    urls = dict()
-
-    for url in url_list:
-        for char in url:
-            if char in CHARS:
-                char = quote(char)
-        r = requests.head(url, proxies=proxies, verify=False)
-        if r.status_code == requests.codes.ok:
-            print(url, "ok")
-            urls["ok"] = url
-        else:
-            print(url, "not ok")
-            urls["not ok"] = url
-    return urls
+# write the results to a file
+def write_result(wordlist, filename):
+    with open(filename, "w") as f:
+        for k, v in wordlist.items():
+            if len(v) > 0:
+                print(k, ":", len(v))
+                # write file to the specified filename
+                f.write(k)
 
 
 def get_all_keys(json_obj):
@@ -422,12 +407,12 @@ def get_param_names(url_list):
         if query[0] == "":
             pass
         elif len(query) == 2:
-            if query[0] not in param_names_list:
+            if query[0] not in param_names_list and query[0] != "":
                 param_names_list.append(query[0])
         else:
             query = query[::2]
             for param in query:
-                if param not in param_names_list:
+                if param not in param_names_list and param != "":
                     param_names_list.append(param)
     param_names_list.sort()
     return param_names_list
@@ -503,7 +488,7 @@ def command_line_parser():
     )
     parser.add_argument("-is", "--in-scope", help="in-scope domains", nargs="*")
     parser.add_argument("-os", "--out-scope", help="out-scope domains", nargs="*")
-    parser.add_argument("-o", "--output", help="Output file name.")
+    parser.add_argument("-o", "--output", help="path to the output file")
     parser.add_argument(
         "-e",
         "--endpoints",
@@ -513,6 +498,7 @@ def command_line_parser():
     parser.add_argument(
         "-jk", "--json-keys", help="find all json keys", action="store_true"
     )
+    parser.add_argument("-a", "--all", help="find all", action="store_true")
 
     return parser
 
@@ -610,6 +596,15 @@ def main():
             files_list = show_all_files(files_list)
         if args["json_keys"]:
             json_keys = get_json_keys(args["burp_file"])
+        if args["all"]:
+            if args["burp_file"]:
+                endpoints = get_endpoints(args["burp_file"])
+                directories_list = get_directories(endpoints["urls"])
+                files_list = get_files(endpoints["urls"])
+                param_names_list = get_param_names(endpoints["urls"])
+                param_values_list = get_param_values(endpoints["urls"])
+                json_keys = get_json_keys(args["burp_file"])
+        
 
     wordlist["directories"] = directories_list
     wordlist["file"] = files_list
