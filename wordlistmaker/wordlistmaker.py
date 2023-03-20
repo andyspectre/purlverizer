@@ -604,6 +604,11 @@ def main():
                 param_names_list = get_param_names(endpoints["urls"])
                 param_values_list = get_param_values(endpoints["urls"])
                 json_keys = get_json_keys(args["burp_file"])
+            elif args["url"]:
+                directories_list = get_directories(url_list)
+                files_list = get_files(url_list)
+                param_names_list = get_param_names(url_list)
+                param_values_list = get_param_values(url_list)
         
 
     wordlist["directories"] = directories_list
