@@ -189,10 +189,13 @@ def print_result(wordlist):
             #     print(i)
 
 
-# write the results to a file
 def write_result(wordlist, output_dir):
+    """
+    Write the results to a file. It takes a dictionary of lists and it writes the files to a destination folder (it will create it if it doesn't exist), such as the filenames are the keys in the dictionary and the content of the files are the values in the lists
+    """
+    # create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
-        os.makedirs(output_dir)  # create the output directory if it doesn't exist
+        os.makedirs(output_dir)
 
     # loop over the dictionary items and write the files
     for filename, lines in wordlist.items():
