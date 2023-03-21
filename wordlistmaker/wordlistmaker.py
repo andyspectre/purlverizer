@@ -185,17 +185,23 @@ def print_result(wordlist):
             print("--------")
             print(k, ":", len(v))
             print("--------")
-            for i in v:
-                print(i)
+            # for i in v:
+            #     print(i)
+
 
 # write the results to a file
-def write_result(wordlist, filename):
-    with open(filename, "w") as f:
-        for k, v in wordlist.items():
-            if len(v) > 0:
-                print(k, ":", len(v))
-                # write file to the specified filename
-                f.write(k)
+def write_result(wordlist, output_dir):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)  # create the output directory if it doesn't exist
+
+    # loop over the dictionary items and write the files
+    for filename, lines in wordlist.items():
+        new_filename = filename + "_wordlistmaker"
+        filepath = os.path.join(output_dir, new_filename)
+        if len(lines) > 0:
+            with open(filepath, "w") as f:
+                for line in lines:
+                    f.write(line + "\n")
 
 
 def get_all_keys(json_obj):
@@ -322,9 +328,6 @@ def get_endpoints(burpfile):
     endpoints_found["javascript files"] = js_files
     endpoints_found["probably false positives"] = false_positives
     return endpoints_found
-    # with open('urls_test_list.txt', 'w') as filehandle:
-    #     for url in endpoints_found["urls"]:
-    #         filehandle.writelines(f"{url}\n")
 
 
 def show_all_files(files_list):
@@ -519,6 +522,10 @@ def main():
     args = vars(parser.parse_args())
 
     try:
+        if not args["output"]:
+            sys.exit(
+                "Please provide a path where to save the wordlist with the -o option."
+            )
         if args["burp_file"]:
             if os.stat(args["burp_file"]).st_size == 0:
                 sys.exit("The file is empty.")
@@ -540,6 +547,19 @@ def main():
     except FileNotFoundError:
         sys.exit("No such file or directory.")
     else:
+        if args["all"]:
+            if args["burp_file"]:
+                endpoints = get_endpoints(args["burp_file"])
+                directories_list = get_directories(endpoints["urls"])
+                files_list = get_files(endpoints["urls"])
+                param_names_list = get_param_names(endpoints["urls"])
+                param_values_list = get_param_values(endpoints["urls"])
+                json_keys = get_json_keys(args["burp_file"])
+            elif args["url"]:
+                directories_list = get_directories(url_list)
+                files_list = get_files(url_list)
+                param_names_list = get_param_names(url_list)
+                param_values_list = get_param_values(url_list)
         if args["directories"]:
             if args["burp_file"]:
                 if args["endpoints"]:
@@ -578,6 +598,16 @@ def main():
                     )
                 if args["url"]:
                     param_values_list = get_param_values(url_list)
+        if args["json_keys"]:
+            if args["url"]:
+                sys.exit(
+                    "The --json-keys option is only available with the --burp-file option."
+                )
+            else:
+                try:
+                    json_keys = get_json_keys(args["burp_file"])
+                except TypeError as err:
+                    print(err)
         if args["no_numbers"]:
             if "dirs" in args["no_numbers"]:
                 directories_list = remove_numbers(directories_list)
@@ -594,22 +624,6 @@ def main():
             param_values_list = remove_nonprintable_chars(param_values_list)
         if args["all_files"]:
             files_list = show_all_files(files_list)
-        if args["json_keys"]:
-            json_keys = get_json_keys(args["burp_file"])
-        if args["all"]:
-            if args["burp_file"]:
-                endpoints = get_endpoints(args["burp_file"])
-                directories_list = get_directories(endpoints["urls"])
-                files_list = get_files(endpoints["urls"])
-                param_names_list = get_param_names(endpoints["urls"])
-                param_values_list = get_param_values(endpoints["urls"])
-                json_keys = get_json_keys(args["burp_file"])
-            elif args["url"]:
-                directories_list = get_directories(url_list)
-                files_list = get_files(url_list)
-                param_names_list = get_param_names(url_list)
-                param_values_list = get_param_values(url_list)
-        
 
     wordlist["directories"] = directories_list
     wordlist["file"] = files_list
@@ -620,6 +634,7 @@ def main():
     for url, li in endpoints.items():
         wordlist[url] = li
 
+    write_result(wordlist, args["output"])
     print_result(wordlist)
 
     current, peak = tracemalloc.get_traced_memory()
