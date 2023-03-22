@@ -185,8 +185,8 @@ def print_result(wordlist):
             print("--------")
             print(k, ":", len(v))
             print("--------")
-            # for i in v:
-            #     print(i)
+            for i in v:
+                print(i)
 
 
 def write_result(wordlist, output_dir):
@@ -253,7 +253,7 @@ def get_json_keys(burpfile):
     return json_keys
 
 
-def get_endpoints(burpfile):
+def get_endpoints(burpfile, in_scope_domains=[]):
     """
     description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories
     parameters:
@@ -268,6 +268,10 @@ def get_endpoints(burpfile):
     try:
         for event, elem in ET.iterparse(burpfile):
             if elem.tag == "url" and elem.text not in url_list:
+                if len(in_scope_domains) > 0:
+                    for domain in in_scope_domains:
+                        if domain in elem.text:
+                            url_list.append(elem.text)
                 url_list.append(elem.text)
             if elem.tag == "request" and elem.attrib["base64"] == "true":
                 elem.text = str(base64.b64decode(elem.text))
@@ -279,7 +283,12 @@ def get_endpoints(burpfile):
                         and Path(urlparse(url).path).suffix != ".map"
                         and url not in url_list
                     ):
-                        url_list.append(url)
+                        if len(in_scope_domains) > 0:
+                            for domain in in_scope_domains:
+                                if domain in url:
+                                    url_list.append(url)
+                        else:
+                            url_list.append(url)
                     elif (
                         Path(urlparse(url).path).suffix == ".js"
                         or Path(urlparse(url).path).suffix == ".map"
@@ -305,14 +314,24 @@ def get_endpoints(burpfile):
                         and Path(urlparse(url).path).suffix != ".map"
                         and url not in false_positives
                     ):
-                        false_positives.append(url)
+                        if len(in_scope_domains) > 0:
+                            for domain in in_scope_domains:
+                                if domain in url:
+                                    url_list.append(url)
+                        else:
+                            false_positives.append(url)
                     elif (
                         Path(urlparse(url).path).suffix == ".js"
                         or Path(urlparse(url).path).suffix == ".map"
                     ) and url not in js_files:
                         js_files.append(url)
                     elif url not in url_list and url not in false_positives:
-                        url_list.append(url)
+                        if len(in_scope_domains) > 0:
+                            for domain in in_scope_domains:
+                                if domain in url:
+                                    url_list.append(url)
+                        else:
+                            url_list.append(url)
             elif elem.tag == "response" and elem.attrib["base64"] == "false":
                 print(
                     'Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
@@ -525,16 +544,19 @@ def main():
     args = vars(parser.parse_args())
 
     try:
-        if not args["output"]:
-            sys.exit(
-                "Please provide a path where to save the wordlist with the -o option."
-            )
+        # if not args["output"]:
+        #     sys.exit(
+        #         "Please provide a path where to save the wordlist with the -o option."
+        #     )
         if args["burp_file"]:
             if os.stat(args["burp_file"]).st_size == 0:
                 sys.exit("The file is empty.")
             if args["endpoints"]:
                 print("Parsing ", args["burp_file"], "...")
-                endpoints = get_endpoints(args["burp_file"])
+                if args["in_scope"]:
+                    endpoints = get_endpoints(args["burp_file"], args["in_scope"])
+                else:
+                    endpoints = get_endpoints(args["burp_file"])
         elif args["url"]:
             if os.stat(args["url"]).st_size == 0:
                 sys.exit("The file is empty.")
@@ -576,7 +598,10 @@ def main():
         if args["files"]:
             if args["burp_file"]:
                 if args["endpoints"]:
-                    files_list = get_files(endpoints["urls"])
+                    if args["in_scope"]:
+                        files_list = get_files(endpoints["urls"], args["in_scope"])
+                    else:
+                        files_list = get_files(endpoints["urls"])
                 else:
                     files_list = get_files(get_endpoints(args["burp_file"])["urls"])
             if args["url"]:
@@ -637,7 +662,7 @@ def main():
     for url, li in endpoints.items():
         wordlist[url] = li
 
-    write_result(wordlist, args["output"])
+    # write_result(wordlist, args["output"])
     print_result(wordlist)
 
     current, peak = tracemalloc.get_traced_memory()
