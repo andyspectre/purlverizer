@@ -229,13 +229,13 @@ def get_json_keys(burp_file):
     try:
         for event, elem in ET.iterparse(burp_file):
             if elem.tag == "response" and elem.attrib["base64"] == "true":
-                elem.text = str(base64.b64decode(elem.text))
-                elem.text = unquote(elem.text)
-                elem.text = html.unescape(elem.text)
-                elem.text = elem.text.replace("\\", "").replace("u002F", "/")
-                if CONTENT_TYPE_JSON.search(elem.text):
+                decoded_text = str(base64.b64decode(elem.text))
+                decoded_text = unquote(decoded_text)
+                decoded_text = html.unescape(decoded_text)
+                decoded_text = decoded_text.replace("\\", "").replace("u002F", "/")
+                if CONTENT_TYPE_JSON.search(decoded_text):
                     # split the response into headers and body
-                    headers, body = elem.text.split("rnrn", 1)
+                    headers, body = decoded_text.split("rnrn", 1)
                     # Remove any extra characters from the end of the body and load the JSON data
                     last_brace_index = body.rfind("}")
                     json_obj_str = body[: last_brace_index + 1]
