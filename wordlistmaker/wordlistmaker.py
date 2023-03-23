@@ -309,7 +309,7 @@ def get_endpoints(burp_file, in_scope_domains=[]):
     n = 0
     try:
         for event, elem in ET.iterparse(burp_file):
-            if elem.tag == "url" and elem.text not in urls_found:
+            if elem.tag == "url":
                 urls_found.update(filter_urls_by_domains([elem.text], in_scope_domains))
 
             if elem.tag == "request" and elem.attrib["base64"] == "true":
@@ -318,9 +318,9 @@ def get_endpoints(burp_file, in_scope_domains=[]):
                 urls = URLS.findall(elem.text)
                 for url in urls:
                     suffix = Path(urlparse(url).path).suffix
-                    if suffix != ".js" and suffix != ".map" and url not in urls_found:
+                    if suffix != ".js" and suffix != ".map":
                         urls_found.update(filter_urls_by_domains([url], in_scope_domains))
-                    elif suffix == ".js" or suffix == ".map" and url not in js_found:
+                    elif suffix == ".js" or suffix == ".map":
                         js_found.add(url)
 
             if elem.tag == "response" and elem.attrib["base64"] == "true":
@@ -335,12 +335,14 @@ def get_endpoints(burp_file, in_scope_domains=[]):
                     netloc_suffix = Path(urlparse(url).netloc).suffix
                     if len(Path(urlparse(url).path).stem) == 1:
                         pass
-                    elif suffix not in COMMON_TLD and netloc_suffix not in COMMON_TLD and suffix != ".js" and suffix != ".map" and url not in false_positives:
+                    elif suffix not in COMMON_TLD and netloc_suffix not in COMMON_TLD and suffix != ".js" and suffix != ".map":
                         false_positives.add(url)
-                    elif suffix == ".js" or suffix == ".map" and url not in js_found:
+                    elif suffix == ".js" or suffix == ".map":
                         js_found.add(url)
-                    elif url not in urls_found and url not in false_positives:
+                    else:
                         urls_found.update(filter_urls_by_domains([url], in_scope_domains))
+                        
+                        
             elif elem.tag == "response" and elem.attrib["base64"] == "false":
                 print(
                     'Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
