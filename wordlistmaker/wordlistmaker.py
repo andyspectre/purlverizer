@@ -222,12 +222,12 @@ def get_all_keys(json_obj):
     return keys
 
 
-def get_json_keys(burpfile):
+def get_json_keys(burp_file):
     """Find all the JSON keys inside a Burp Suite XML file"""
     json_keys = set()
     # Check the Content-Type inside the response. If it is application/json, then parse the JSON and extract all the keys.
     try:
-        for event, elem in ET.iterparse(burpfile):
+        for event, elem in ET.iterparse(burp_file):
             if elem.tag == "response" and elem.attrib["base64"] == "true":
                 elem.text = str(base64.b64decode(elem.text))
                 elem.text = unquote(elem.text)
@@ -252,103 +252,84 @@ def get_json_keys(burpfile):
         print(err)
     return json_keys
 
+def filter_urls_by_domains(urls, domains):
+    if len(domains) == 0:
+        return urls
+    return [url for url in urls if any(domain in url for domain in domains)]
 
-def get_endpoints(burpfile, in_scope_domains=[]):
+def get_endpoints(burp_file, in_scope_domains=None):
     """
-    description: accept a Burp Suite XML file or a txt file with a list of URLs and get all the directories
+    description: accept a Burp Suite XML file and search for all the endpoints inside all the request and responses.
     parameters:
-        filename: a Burp Suite XML file or a txt file with a list of URLs
-    return: a list of strings (filenames)
+        burp_file: path to a Burp Suite XML file
+        in_scope_domains: a list of domains to filter the results. If the list is empty, it will return all the endpoints found
+    return: a dictionary containing the following keys: 'urls' (list), 'javascript files' (list), and 'probably false positives' (list), each containing the respective endpoints found.
     """
-    url_list = []
-    js_files = []
-    false_positives = []
-    endpoints_found = dict()
-    n = 0
+    url_set = set()
+    js_files_set = set()
+    false_positives_set = set()
+    item_count = 0
     try:
-        for event, elem in ET.iterparse(burpfile):
-            if elem.tag == "url" and elem.text not in url_list:
-                if len(in_scope_domains) > 0:
-                    for domain in in_scope_domains:
-                        if domain in elem.text:
-                            url_list.append(elem.text)
-                url_list.append(elem.text)
-            if elem.tag == "request" and elem.attrib["base64"] == "true":
-                elem.text = str(base64.b64decode(elem.text))
-                elem.text = unquote(elem.text)
-                urls = URLS.findall(elem.text)
-                for url in urls:
-                    if (
-                        Path(urlparse(url).path).suffix != ".js"
-                        and Path(urlparse(url).path).suffix != ".map"
-                        and url not in url_list
-                    ):
-                        if len(in_scope_domains) > 0:
-                            for domain in in_scope_domains:
-                                if domain in url:
-                                    url_list.append(url)
-                        else:
-                            url_list.append(url)
-                    elif (
-                        Path(urlparse(url).path).suffix == ".js"
-                        or Path(urlparse(url).path).suffix == ".map"
-                        and url not in js_files
-                    ):
-                        js_files.append(url)
-            if elem.tag == "response" and elem.attrib["base64"] == "true":
-                elem.text = str(base64.b64decode(elem.text))
-                elem.text = unquote(elem.text)
-                elem.text = html.unescape(elem.text)
-                elem.text = elem.text.replace("\\", "").replace("u002F", "/")
-                urls = URLS.findall(elem.text)
+        for event, xml_element in ET.iterparse(burp_file):
+            if xml_element.tag == "url" and xml_element.text not in url_set:
+                if in_scope_domains is not None:
+                    url_set.update(filter_urls_by_domains([xml_element.text], in_scope_domains))
+            continue
+            url_set.add(xml_element.text)
 
-                for url in urls:
-                    if len(Path(urlparse(url).path).stem) == 1:
-                        pass
-                    elif (
-                        (
-                            Path(urlparse(url).path).suffix not in COMMON_TLD
-                            and Path(urlparse(url).netloc).suffix not in COMMON_TLD
-                        )
-                        and Path(urlparse(url).path).suffix != ".js"
-                        and Path(urlparse(url).path).suffix != ".map"
-                        and url not in false_positives
-                    ):
-                        if len(in_scope_domains) > 0:
-                            for domain in in_scope_domains:
-                                if domain in url:
-                                    url_list.append(url)
-                        else:
-                            false_positives.append(url)
-                    elif (
-                        Path(urlparse(url).path).suffix == ".js"
-                        or Path(urlparse(url).path).suffix == ".map"
-                    ) and url not in js_files:
-                        js_files.append(url)
-                    elif url not in url_list and url not in false_positives:
-                        if len(in_scope_domains) > 0:
-                            for domain in in_scope_domains:
-                                if domain in url:
-                                    url_list.append(url)
-                        else:
-                            url_list.append(url)
-            elif elem.tag == "response" and elem.attrib["base64"] == "false":
-                print(
-                    'Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
-                )
-            if elem.tag == "item":
-                n += 1
-            elem.clear()
-        print("Reached the end", n, "times.")
+        if xml_element.tag == "request" and xml_element.attrib.get("base64", "") == "true":
+            decoded_text = base64.b64decode(xml_element.text).decode("utf-8", "ignore")
+            decoded_text = unquote(decoded_text)
+            urls = URLS.findall(decoded_text)
+            for url in urls:
+                suffix = Path(urlparse(url).path).suffix
+                if suffix != ".js" and suffix != ".map" and url not in url_set:
+                    url_set.update(filter_urls_by_domains([url], in_scope_domains))
+                elif suffix == ".js" or suffix == ".map" and url not in js_files_set:
+                    js_files_set.add(url)
+
+        if xml_element.tag == "response" and xml_element.attrib.get("base64", "") == "true":
+            decoded_text = base64.b64decode(xml_element.text).decode("utf-8", "ignore")
+            decoded_text = unquote(decoded_text)
+            decoded_text = html.unescape(decoded_text)
+            decoded_text = decoded_text.replace("\\", "").replace("u002F", "/")
+            urls = URLS.findall(decoded_text)
+
+            for url in urls:
+                suffix = Path(urlparse(url).path).suffix
+                netloc_suffix = Path(urlparse(url).netloc).suffix
+                if len(Path(urlparse(url).path).stem) == 1:
+                    pass
+                elif suffix not in COMMON_TLD and netloc_suffix not in COMMON_TLD and suffix != ".js" and suffix != ".map" and url not in false_positives_set:
+                    false_positives_set.add(url)
+                elif suffix == ".js" or suffix == ".map" and url not in js_files_set:
+                    js_files_set.add(url)
+                elif url not in url_set and url not in false_positives_set:
+                    url_set.update(filter_urls_by_domains([url], in_scope_domains))
+
+        elif xml_element.tag == "response" and xml_element.attrib.get("base64", "") == "false":
+            print("Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select 'Base64-encode requests and responses' when saving the items from Burp Suite Site map.")
+
+        if xml_element.tag == "item":
+            item_count += 1
+            xml_element.clear()
+
+        print(f"Reached the end {item_count} times.")
+
     except ET.ParseError as err:
         print(err)
 
+    url_list = list(url_set)
+    js_files_list = list(js_files_set)
+    false_positives_list = list(false_positives_set)
     url_list.sort()
-    js_files.sort()
-    false_positives.sort()
-    endpoints_found["urls"] = url_list
-    endpoints_found["javascript files"] = js_files
-    endpoints_found["probably false positives"] = false_positives
+    js_files_list.sort()
+    false_positives_list.sort()
+    endpoints_found = {
+        "urls": url_list,
+        "javascript files": js_files_list,
+        "probably false positives": false_positives_list,
+    }
     return endpoints_found
 
 
