@@ -176,6 +176,11 @@ COMMON_TLD = [
 ]
 URLS = re.compile(FIND_URLS)
 CONTENT_TYPE_JSON = re.compile(r"Content-Type: application/json")
+CONTENT_TYPE_JS = re.compile(r"Content-Type: ?(application|text)/(?:x-)?javascript")
+# API_ENDPOINTS = re.compile(
+#     r"/api/([a-zA-Z0-9-_.?\\]/?)+({[a-zA-Z0-9-_.?\\]+}/?[a-zA-Z0-9-_.?\\]+/?)*([a-zA-Z0-9-_.?\\]/?)*"
+# )
+API_ENDPOINTS = re.compile(r"\/api\/[a-zA-Z0-9-_.?&=/]*\b")
 
 
 def print_result(wordlist):
@@ -189,10 +194,58 @@ def print_result(wordlist):
                 print(i)
 
 
+def write_dict_to_file(my_dict, filename):
+    import os
+
+
+import json
+
+
+def write_dict_to_file(my_dict, dir_path):
+    # Check if the user has write permissions to the directory
+    if not os.access(dir_path, os.W_OK):
+        print(f"You don't have write permissions to {dir_path}. Please choose a different directory.")
+        return
+    
+    # Create the directory if it doesn't exist
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+
+    # Set the filename and check for conflicts
+    filename = os.path.join(dir_path, "apis_found.txt")
+    while os.path.exists(filename):
+        overwrite = input(
+            f"The file {filename} already exists. Enter a new filename or press Enter to overwrite: "
+        )
+        if overwrite == "":
+            break
+        filename = os.path.join(dir_path, overwrite)
+    
+    # Check if the user has write permissions to the file
+    if not os.access(os.path.dirname(filename), os.W_OK):
+        print(f"You don't have write permissions to {os.path.dirname(filename)}. Please choose a different directory.")
+        return
+
+    # Write the dictionary to the file
+    with open(filename, "w") as f:
+        for key, value in my_dict.items():
+            f.write(f"{key}:\n")
+            for item in value:
+                f.write(f"  - {item}\n")
+
+    # Print a message confirming the write operation
+    print(f"Dictionary written to file: {filename}")
+
+
 def write_result(wordlist, output_dir):
     """
     Write the results to a file. It takes a dictionary of lists and it writes the files to a destination folder (it will create it if it doesn't exist), such as the filenames are the keys in the dictionary and the content of the files are the values in the lists
     """
+    # Check if the user has write permissions to the directory
+    if not os.access(output_dir, os.W_OK):
+        print(f"You don't have write permissions to {output_dir}. Please choose a different directory.")
+        return
+    
     # create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -201,10 +254,55 @@ def write_result(wordlist, output_dir):
     for filename, lines in wordlist.items():
         new_filename = filename + "_wordlistmaker"
         filepath = os.path.join(output_dir, new_filename)
+
+    # Check if the user has write permissions to the file
+        if os.path.exists(filepath) and not os.access(filepath, os.W_OK):
+            print(f"You don't have write permissions to {filepath}. Please choose a different filename.")
+            continue
+    
+    # Check if the file already exists and ask the user for a new filename if there's a conflict
+        while os.path.exists(filepath):
+            overwrite = input(
+                f"The file {filepath} already exists. Enter a new filename or press Enter to overwrite: "
+            )
+            if overwrite == "":
+                break
+            new_filename = overwrite + "_wordlistmaker"
+            filepath = os.path.join(output_dir, new_filename)
+
         if len(lines) > 0:
             with open(filepath, "w") as f:
                 for line in lines:
                     f.write(line + "\n")
+
+
+def find_api_endpoints_in_js(burp_file):
+    """Find all the API endpoints inside all js responses of a Burp Suite XML file"""
+    api_endpoints = set()
+    api_found_in_js = dict()
+    url = ""
+    for event, elem in ET.iterparse(burp_file):
+        if elem.tag == "url":
+            url = elem.text
+        if elem.tag == "response" and elem.attrib["base64"] == "true":
+            decoded_text = str(base64.b64decode(elem.text))
+            decoded_text = unquote(decoded_text)
+            decoded_text = html.unescape(decoded_text)
+            decoded_text = decoded_text.replace("\\", "").replace("u002F", "/")
+            if CONTENT_TYPE_JS.search(decoded_text):
+                # Look for API endpoints in decoded text
+                endpoints = API_ENDPOINTS.findall(decoded_text)
+                # api_endpoints.update(endpoints)
+                # add each API endpoint to the dictionary
+                api_found_in_js.setdefault(url, set()).update(endpoints)
+
+        if elem.tag == "item":
+            elem.clear()
+
+    # Return the list of unique API endpoints found
+    # api_endpoints_list = list(api_endpoints)
+    # api_endpoints_list.sort()
+    return api_found_in_js
 
 
 def get_all_keys(json_obj):
@@ -252,6 +350,7 @@ def get_json_keys(burp_file):
         print(err)
     return json_keys
 
+
 def filter_urls_by_domains(urls, domains):
     """
     Filters a list of URLs by a list of domains.
@@ -273,6 +372,7 @@ def filter_urls_by_domains(urls, domains):
     if len(domains) == 0:
         return urls
     return [url for url in urls if any(domain in url for domain in domains)]
+
 
 def get_endpoints(burp_file, in_scope_domains=[]):
     """
@@ -319,7 +419,9 @@ def get_endpoints(burp_file, in_scope_domains=[]):
                 for url in urls:
                     suffix = Path(urlparse(url).path).suffix
                     if suffix != ".js" and suffix != ".map":
-                        urls_found.update(filter_urls_by_domains([url], in_scope_domains))
+                        urls_found.update(
+                            filter_urls_by_domains([url], in_scope_domains)
+                        )
                     elif suffix == ".js" or suffix == ".map":
                         js_found.add(url)
 
@@ -335,14 +437,20 @@ def get_endpoints(burp_file, in_scope_domains=[]):
                     netloc_suffix = Path(urlparse(url).netloc).suffix
                     if len(Path(urlparse(url).path).stem) == 1:
                         pass
-                    elif suffix not in COMMON_TLD and netloc_suffix not in COMMON_TLD and suffix != ".js" and suffix != ".map":
+                    elif (
+                        suffix not in COMMON_TLD
+                        and netloc_suffix not in COMMON_TLD
+                        and suffix != ".js"
+                        and suffix != ".map"
+                    ):
                         false_positives.add(url)
                     elif suffix == ".js" or suffix == ".map":
                         js_found.add(url)
                     else:
-                        urls_found.update(filter_urls_by_domains([url], in_scope_domains))
-                        
-                        
+                        urls_found.update(
+                            filter_urls_by_domains([url], in_scope_domains)
+                        )
+
             elif elem.tag == "response" and elem.attrib["base64"] == "false":
                 print(
                     'Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
@@ -537,7 +645,10 @@ def command_line_parser():
     parser.add_argument(
         "-jk", "--json-keys", help="find all json keys", action="store_true"
     )
-    parser.add_argument("-a", "--all", help="find all", action="store_true")
+    parser.add_argument("-A", "--all", help="find all", action="store_true")
+    parser.add_argument(
+        "-a", "--api", help="find all api endpoints", action="store_true"
+    )
 
     return parser
 
@@ -554,6 +665,7 @@ def main():
     param_names_list = []
     param_values_list = []
     json_keys = []
+    api_endpoints = dict()
     parser = command_line_parser()
     args = vars(parser.parse_args())
 
@@ -571,6 +683,8 @@ def main():
                     endpoints = get_endpoints(args["burp_file"], args["in_scope"])
                 else:
                     endpoints = get_endpoints(args["burp_file"])
+            if args["api"]:
+                api_endpoints = find_api_endpoints_in_js(args["burp_file"])
         elif args["url"]:
             if os.stat(args["url"]).st_size == 0:
                 sys.exit("The file is empty.")
@@ -676,8 +790,17 @@ def main():
     for url, li in endpoints.items():
         wordlist[url] = li
 
+    # for url, endpoints in api_endpoints.items():
+    #     print(url,':', len(endpoints))
+    #     endpoints = list(endpoints)
+    #     endpoints.sort()
+    #     for endpoint in endpoints:
+    #         print(endpoint)
+
+    write_dict_to_file(api_endpoints, args["output"])
+
     # write_result(wordlist, args["output"])
-    print_result(wordlist)
+    # print_result(wordlist)
 
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
