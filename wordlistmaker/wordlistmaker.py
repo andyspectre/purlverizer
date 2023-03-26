@@ -177,9 +177,6 @@ COMMON_TLD = [
 URLS = re.compile(FIND_URLS)
 CONTENT_TYPE_JSON = re.compile(r"Content-Type: application/json")
 CONTENT_TYPE_JS = re.compile(r"Content-Type: ?(application|text)/(?:x-)?javascript")
-# API_ENDPOINTS = re.compile(
-#     r"/api/([a-zA-Z0-9-_.?\\]/?)+({[a-zA-Z0-9-_.?\\]+}/?[a-zA-Z0-9-_.?\\]+/?)*([a-zA-Z0-9-_.?\\]/?)*"
-# )
 API_ENDPOINTS = re.compile(r"\/api\/[a-zA-Z0-9-_.?&=/]*\b")
 
 
@@ -194,11 +191,6 @@ def print_result(wordlist):
                 print(i)
 
 
-def write_dict_to_file(my_dict, filename):
-    import os
-
-
-import json
 
 
 def write_dict_to_file(my_dict, dir_path):
@@ -406,7 +398,6 @@ def get_endpoints(burp_file, in_scope_domains=[]):
     js_found = set()
     false_positives = set()
     endpoints_found = dict()
-    n = 0
     try:
         for event, elem in ET.iterparse(burp_file):
             if elem.tag == "url":
@@ -456,9 +447,7 @@ def get_endpoints(burp_file, in_scope_domains=[]):
                     'Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
                 )
             if elem.tag == "item":
-                n += 1
-            elem.clear()
-        print("Reached the end", n, "times.")
+                elem.clear()
     except ET.ParseError as err:
         print(err)
 
@@ -670,10 +659,10 @@ def main():
     args = vars(parser.parse_args())
 
     try:
-        # if not args["output"]:
-        #     sys.exit(
-        #         "Please provide a path where to save the wordlist with the -o option."
-        #     )
+        if not args["output"]:
+            sys.exit(
+                "Please provide a path where to save the wordlist with the -o option."
+            )
         if args["burp_file"]:
             if os.stat(args["burp_file"]).st_size == 0:
                 sys.exit("The file is empty.")
@@ -799,7 +788,7 @@ def main():
 
     write_dict_to_file(api_endpoints, args["output"])
 
-    # write_result(wordlist, args["output"])
+    write_result(wordlist, args["output"])
     # print_result(wordlist)
 
     current, peak = tracemalloc.get_traced_memory()
