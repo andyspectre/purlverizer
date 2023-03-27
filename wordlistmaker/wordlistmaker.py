@@ -191,14 +191,14 @@ def print_result(wordlist):
                 print(i)
 
 
-
-
 def write_dict_to_file(my_dict, dir_path):
     # Check if the user has write permissions to the directory
     if not os.access(dir_path, os.W_OK):
-        print(f"You don't have write permissions to {dir_path}. Please choose a different directory.")
+        print(
+            f"You don't have write permissions to {dir_path}. Please choose a different directory."
+        )
         return
-    
+
     # Create the directory if it doesn't exist
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
@@ -212,18 +212,22 @@ def write_dict_to_file(my_dict, dir_path):
         if overwrite == "":
             break
         filename = os.path.join(dir_path, overwrite)
-    
+
     # Check if the user has write permissions to the file
     if not os.access(os.path.dirname(filename), os.W_OK):
-        print(f"You don't have write permissions to {os.path.dirname(filename)}. Please choose a different directory.")
+        print(
+            f"You don't have write permissions to {os.path.dirname(filename)}. Please choose a different directory."
+        )
         return
 
     # Write the dictionary to the file
     with open(filename, "w") as f:
         for key, value in my_dict.items():
-            f.write(f"{key}:\n")
-            for item in value:
-                f.write(f"  - {item}\n")
+            if value:
+                f.write(f"{key}:\n")
+                for item in value:
+                    f.write(f"{item}\n")
+                f.write("\n")
 
     # Print a message confirming the write operation
     print(f"Dictionary written to file: {filename}")
@@ -235,9 +239,11 @@ def write_result(wordlist, output_dir):
     """
     # Check if the user has write permissions to the directory
     if not os.access(output_dir, os.W_OK):
-        print(f"You don't have write permissions to {output_dir}. Please choose a different directory.")
+        print(
+            f"You don't have write permissions to {output_dir}. Please choose a different directory."
+        )
         return
-    
+
     # create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -247,12 +253,14 @@ def write_result(wordlist, output_dir):
         new_filename = filename + "_wordlistmaker"
         filepath = os.path.join(output_dir, new_filename)
 
-    # Check if the user has write permissions to the file
+        # Check if the user has write permissions to the file
         if os.path.exists(filepath) and not os.access(filepath, os.W_OK):
-            print(f"You don't have write permissions to {filepath}. Please choose a different filename.")
+            print(
+                f"You don't have write permissions to {filepath}. Please choose a different filename."
+            )
             continue
-    
-    # Check if the file already exists and ask the user for a new filename if there's a conflict
+
+        # Check if the file already exists and ask the user for a new filename if there's a conflict
         while os.path.exists(filepath):
             overwrite = input(
                 f"The file {filepath} already exists. Enter a new filename or press Enter to overwrite: "
@@ -576,14 +584,9 @@ def command_line_parser():
     parser = argparse.ArgumentParser(
         description="Take a list of URLs or a Burp Suite XML file as input and get a list of: directories, files, parameters names, parameters values and links."
     )
-    parser.add_argument("-u", "--url", help="Path to a list of URLs.")
-    parser.add_argument("-b", "--burp-file", help="Path to a Burp XML file.")
-    parser.add_argument(
-        "-l",
-        "--list-of-urls",
-        help="find all URLs from the Burp file",
-        action="store_true",
-    )
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("-u", "--url", help="Path to a list of URLs.")
+    input_group.add_argument("-b", "--burp-file", help="Path to a Burp XML file.")
     parser.add_argument(
         "-d",
         "--directories",
@@ -623,7 +626,6 @@ def command_line_parser():
         action="store_false",
     )
     parser.add_argument("-is", "--in-scope", help="in-scope domains", nargs="*")
-    parser.add_argument("-os", "--out-scope", help="out-scope domains", nargs="*")
     parser.add_argument("-o", "--output", help="path to the output file")
     parser.add_argument(
         "-e",
@@ -642,154 +644,121 @@ def command_line_parser():
     return parser
 
 
+def check_file(file_path):
+    if not os.path.exists(file_path):
+        sys.exit(f"No such file or directory: {file_path}")
+    if os.stat(file_path).st_size == 0:
+        sys.exit(f"The file is empty: {file_path}")
+
+
+def get_all_items(args, source_list):
+    items = {
+        "directories": get_directories(source_list),
+        "files": get_files(source_list),
+        "param_names": get_param_names(source_list),
+        "param_values": get_param_values(source_list),
+    }
+    if args["burp_file"]:
+        items["json_keys"] = get_json_keys(args["burp_file"])
+    return items
+
+
+def remove_numbers_from_wordlist(wordlist, no_numbers):
+    for key in no_numbers:
+        if key in wordlist:
+            wordlist[key] = remove_numbers(wordlist[key])
+    return wordlist
+
+
+def remove_nonprintable_chars_from_wordlist(wordlist):
+    for key, value in wordlist.items():
+        wordlist[key] = remove_nonprintable_chars(value)
+    return wordlist
+
+
 def main():
     """Takes input from the cli, pass it to the parsing functions and then returns
     the wordlist.
     """
-    wordlist = dict()
+    wordlist = {
+        "directories": [],
+        "files": [],
+        "param_names": [],
+        "param_values": [],
+        "json_keys": [],
+    }
     endpoints = dict()
-    directories_list = []
-    url_list = []
-    files_list = []
-    param_names_list = []
-    param_values_list = []
-    json_keys = []
     api_endpoints = dict()
+    url_list = []
+
     parser = command_line_parser()
     args = vars(parser.parse_args())
 
-    try:
-        if not args["output"]:
-            sys.exit(
-                "Please provide a path where to save the wordlist with the -o option."
-            )
-        if args["burp_file"]:
-            if os.stat(args["burp_file"]).st_size == 0:
-                sys.exit("The file is empty.")
-            if args["endpoints"]:
-                print("Parsing ", args["burp_file"], "...")
-                if args["in_scope"]:
-                    endpoints = get_endpoints(args["burp_file"], args["in_scope"])
-                else:
-                    endpoints = get_endpoints(args["burp_file"])
-            if args["api"]:
-                api_endpoints = find_api_endpoints_in_js(args["burp_file"])
-        elif args["url"]:
-            if os.stat(args["url"]).st_size == 0:
-                sys.exit("The file is empty.")
-            with open((args["url"]), encoding="utf 8") as f:
-
-                print("Parsing ", args["url"], "...")
-                for line in f:
-                    url = line.strip()
-                    url_list.append(url)
-        else:
-            parser.print_help()
-            sys.exit()
-    except FileNotFoundError:
-        sys.exit("No such file or directory.")
-    else:
-        if args["all"]:
-            if args["burp_file"]:
+    if not args["output"]:
+        sys.exit("Please provide a path where to save the wordlist with the -o option.")
+    if args["burp_file"]:
+        check_file(args["burp_file"])
+        print("Parsing ", args["burp_file"], "...")
+        if args["endpoints"]:
+            if args["in_scope"]:
+                endpoints = get_endpoints(args["burp_file"], args["in_scope"])
+            else:
                 endpoints = get_endpoints(args["burp_file"])
-                directories_list = get_directories(endpoints["urls"])
-                files_list = get_files(endpoints["urls"])
-                param_names_list = get_param_names(endpoints["urls"])
-                param_values_list = get_param_values(endpoints["urls"])
-                json_keys = get_json_keys(args["burp_file"])
-            elif args["url"]:
-                directories_list = get_directories(url_list)
-                files_list = get_files(url_list)
-                param_names_list = get_param_names(url_list)
-                param_values_list = get_param_values(url_list)
+        if args["api"]:
+            api_endpoints = find_api_endpoints_in_js(args["burp_file"])
+    elif args["url"]:
+        check_file(args["url"])
+        with open((args["url"]), encoding="utf 8") as f:
+            print("Parsing ", args["url"], "...")
+            for line in f:
+                url = line.strip()
+                url_list.append(url)
+    else:
+        parser.print_help()
+        sys.exit()
+
+    source_list = None
+    if args["burp_file"]:
+        if args["endpoints"]:
+            source_list = endpoints["urls"]
+        else:
+            source_list = get_endpoints(args["burp_file"])["urls"]
+    elif args["url"]:
+        source_list = url_list
+
+    if args["all"]:
+        wordlist.update(get_all_items(args, source_list))
+    else:
         if args["directories"]:
-            if args["burp_file"]:
-                if args["endpoints"]:
-                    directories_list = get_directories(endpoints["urls"])
-                else:
-                    directories_list = get_directories(
-                        get_endpoints(args["burp_file"])["urls"]
-                    )
-            if args["url"]:
-                directories_list = get_directories(url_list)
+            wordlist["directories"] = get_directories(source_list)
         if args["files"]:
-            if args["burp_file"]:
-                if args["endpoints"]:
-                    if args["in_scope"]:
-                        files_list = get_files(endpoints["urls"], args["in_scope"])
-                    else:
-                        files_list = get_files(endpoints["urls"])
-                else:
-                    files_list = get_files(get_endpoints(args["burp_file"])["urls"])
-            if args["url"]:
-                files_list = get_files(url_list)
+            wordlist["files"] = get_files(source_list)
         if args["param_names"]:
-            if args["burp_file"]:
-                if args["endpoints"]:
-                    param_names_list = get_param_names(endpoints["urls"])
-                else:
-                    param_names_list = get_param_names(
-                        get_endpoints(args["burp_file"])["urls"]
-                    )
-            if args["url"]:
-                param_names_list = get_param_names(url_list)
+            wordlist["param_names"] = get_param_names(source_list)
         if args["param_values"]:
-            if args["burp_file"]:
-                if args["endpoints"]:
-                    param_values_list = get_param_values(endpoints["urls"])
-                else:
-                    param_values_list = get_param_values(
-                        get_endpoints(args["burp_file"])["urls"]
-                    )
-                if args["url"]:
-                    param_values_list = get_param_values(url_list)
+            wordlist["param_values"] = get_param_values(source_list)
         if args["json_keys"]:
             if args["url"]:
                 sys.exit(
                     "The --json-keys option is only available with the --burp-file option."
                 )
             else:
-                try:
-                    json_keys = get_json_keys(args["burp_file"])
-                except TypeError as err:
-                    print(err)
-        if args["no_numbers"]:
-            if "dirs" in args["no_numbers"]:
-                directories_list = remove_numbers(directories_list)
-            if "files" in args["no_numbers"]:
-                files_list = remove_numbers(files_list)
-            if "param-names" in args["no_numbers"]:
-                param_names_list = remove_numbers(param_names_list)
-            if "param-values" in args["no_numbers"]:
-                param_values_list = remove_numbers(param_values_list)
-        if args["nonprintable"]:
-            directories_list = remove_nonprintable_chars(directories_list)
-            files_list = remove_nonprintable_chars(files_list)
-            param_names_list = remove_nonprintable_chars(param_names_list)
-            param_values_list = remove_nonprintable_chars(param_values_list)
-        if args["all_files"]:
-            files_list = show_all_files(files_list)
+                wordlist["json_keys"] = get_json_keys(args["burp_file"])
+    if args["no_numbers"]:
+        wordlist = remove_numbers_from_wordlist(wordlist, args["no_numbers"])
 
-    wordlist["directories"] = directories_list
-    wordlist["file"] = files_list
-    wordlist["param names"] = param_names_list
-    wordlist["param values"] = param_values_list
-    wordlist["json keys"] = json_keys
+    if args["nonprintable"]:
+        wordlist = remove_nonprintable_chars_from_wordlist(wordlist)
 
-    for url, li in endpoints.items():
-        wordlist[url] = li
+    if args["all_files"]:
+        wordlist["files"] = show_all_files(wordlist["files"])
 
-    # for url, endpoints in api_endpoints.items():
-    #     print(url,':', len(endpoints))
-    #     endpoints = list(endpoints)
-    #     endpoints.sort()
-    #     for endpoint in endpoints:
-    #         print(endpoint)
+    wordlist.update(endpoints)
+    if api_endpoints:
+        write_dict_to_file(api_endpoints, args["output"])
 
-    write_dict_to_file(api_endpoints, args["output"])
-
-    write_result(wordlist, args["output"])
-    # print_result(wordlist)
+    if any(wordlist.values()):
+        write_result(wordlist, args["output"])
 
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
