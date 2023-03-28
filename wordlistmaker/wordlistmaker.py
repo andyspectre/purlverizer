@@ -432,23 +432,24 @@ def get_endpoints(burp_file, in_scope_domains=[]):
                 urls = URLS.findall(decoded_text)
 
                 for url in urls:
-                    suffix = Path(urlparse(url).path).suffix
-                    netloc_suffix = Path(urlparse(url).netloc).suffix
-                    if len(Path(urlparse(url).path).stem) == 1:
-                        pass
-                    elif (
-                        suffix not in COMMON_TLD
-                        or netloc_suffix not in COMMON_TLD
-                        and suffix != ".js"
-                        and suffix != ".map"
-                    ):
-                        false_positives.add(url)
-                    elif suffix == ".js" or suffix == ".map":
-                        js_found.add(url)
-                    else:
-                        urls_found.update(
-                            filter_urls_by_domains([url], in_scope_domains)
-                        )
+                    parsed_url = urlparse(url)
+                    path_suffix = Path(parsed_url.path).suffix
+                    netloc_suffix = Path(parsed_url.netloc).suffix
+
+                    if len(Path(parsed_url.path).stem) > 1:
+                        if (path_suffix not in COMMON_TLD or netloc_suffix not in COMMON_TLD) and (path_suffix != ".js" and path_suffix != ".map"):
+                            false_positives.add(url)
+                        elif path_suffix == ".js" or path_suffix == ".map":
+                            js_found.add(url)
+                        else:
+                            filtered_urls = filter_urls_by_domains([url], in_scope_domains)
+                            for filtered_url in filtered_urls:
+                                parsed_filtered_url = urlparse(filtered_url)
+                                filtered_netloc_suffix = Path(parsed_filtered_url.netloc).suffix
+
+                                # Check if the hostname's suffix is in COMMON_TLD
+                                if filtered_netloc_suffix in COMMON_TLD:
+                                    urls_found.add(filtered_url)
 
             elif elem.tag == "response" and elem.attrib["base64"] == "false":
                 print(
