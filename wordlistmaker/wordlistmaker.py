@@ -250,7 +250,7 @@ def write_result(wordlist, output_dir):
 
     # loop over the dictionary items and write the files
     for filename, lines in wordlist.items():
-        new_filename = filename + "_wordlistmaker"
+        new_filename = filename + "_wordlistmaker.txt"
         filepath = os.path.join(output_dir, new_filename)
 
         # Check if the user has write permissions to the file
@@ -438,7 +438,7 @@ def get_endpoints(burp_file, in_scope_domains=[]):
                         pass
                     elif (
                         suffix not in COMMON_TLD
-                        and netloc_suffix not in COMMON_TLD
+                        or netloc_suffix not in COMMON_TLD
                         and suffix != ".js"
                         and suffix != ".map"
                     ):
@@ -466,8 +466,8 @@ def get_endpoints(burp_file, in_scope_domains=[]):
     js_list.sort()
     false_positives_list.sort()
     endpoints_found["urls"] = url_list
-    endpoints_found["javascript files"] = js_list
-    endpoints_found["probably false positives"] = false_positives_list
+    endpoints_found["javascript_files"] = js_list
+    endpoints_found["probably_false_positives"] = false_positives_list
     return endpoints_found
 
 
