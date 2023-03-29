@@ -376,6 +376,7 @@ def filter_urls_by_domains(urls, domains):
     return [url for url in urls if any(domain in url for domain in domains)]
 
 
+
 def get_endpoints(burp_file, in_scope_domains=[]):
     """
     Searches for endpoints in a Burp Suite XML file and returns them in a dictionary.
@@ -404,61 +405,41 @@ def get_endpoints(burp_file, in_scope_domains=[]):
     urls_found = set()
     js_found = set()
     false_positives = set()
-    endpoints_found = dict()
+
     try:
         for event, elem in ET.iterparse(burp_file):
             if elem.tag == "url":
                 urls_found.update(filter_urls_by_domains([elem.text], in_scope_domains))
-
-            if elem.tag == "request" and elem.attrib["base64"] == "true":
-                elem.text = str(base64.b64decode(elem.text))
-                elem.text = unquote(elem.text)
-                urls = URLS.findall(elem.text)
-                for url in urls:
-                    suffix = Path(urlparse(url).path).suffix
-                    if suffix != ".js" and suffix != ".map":
-                        urls_found.update(
-                            filter_urls_by_domains([url], in_scope_domains)
-                        )
-                    elif suffix == ".js" or suffix == ".map":
-                        js_found.add(url)
-
-            if elem.tag == "response" and elem.attrib["base64"] == "true":
-                try:
+            try:
+                if elem.tag == "response" and elem.attrib["base64"] == "true":
                     decoded_text = str(base64.b64decode(elem.text))
                     decoded_text = unquote(decoded_text)
                     decoded_text = html.unescape(decoded_text)
                     decoded_text = decoded_text.replace("\\", "").replace("u002F", "/")
                     urls = URLS.findall(decoded_text)
 
-                    js_found= {url for url in urls if Path(urlparse(url).path).suffix in {".js", ".map"}}
-                    false_positives = {url for url in urls if not TLDS.search(url) and url not in js_found}
-                    in_scope_urls = {url for url in urls if TLDS.search(url) and len(Path(urlparse(url).path).stem) > 1 and url not in false_positives and url not in js_found}
-                    filtered_in_scope_urls = filter_urls_by_domains(in_scope_urls, in_scope_domains)
-                    urls_found = set(filtered_in_scope_urls)
+                    js_found |= {url for url in urls if Path(urlparse(url).path).suffix in {".js", ".map"}}
+                    false_positives |= {url for url in urls if not TLDS.search(url) and url not in js_found}
+                    all_urls = {url for url in urls if TLDS.search(url) and len(Path(urlparse(url).path).stem) > 1 and url not in false_positives and url not in js_found}
+                    in_scope_urls =  filter_urls_by_domains(all_urls, in_scope_domains)
+                    urls_found |= set(in_scope_urls)
+            except TypeError:
+                pass
 
-                # catch a TypeError if the response is empty
-                except TypeError:
-                    pass
-                    
-            elif elem.tag == "response" and elem.attrib["base64"] == "false":
-                print(
-                    'Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
-                )
+            if elem.tag == "response" and elem.attrib["base64"] == "false":
+                print('Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
+            )
             if elem.tag == "item":
                 elem.clear()
     except ET.ParseError as err:
         print(err)
 
-    url_list = list(urls_found)
-    js_list = list(js_found)
-    false_positives_list = list(false_positives)
-    url_list.sort()
-    js_list.sort()
-    false_positives_list.sort()
-    endpoints_found["urls"] = url_list
-    endpoints_found["javascript_files"] = js_list
-    endpoints_found["probably_false_positives"] = false_positives_list
+    endpoints_found = {
+        "urls": sorted(urls_found),
+        "javascript_files": sorted(js_found),
+        "probably_false_positives": sorted(false_positives),
+    }
+
     return endpoints_found
 
 
