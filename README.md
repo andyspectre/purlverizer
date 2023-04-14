@@ -1,6 +1,6 @@
 # Pu(r)lverizer
 
-Purlverizer is a tool that can help you generate custom wordlists based on various inputs. At the moment it's an offline only tool that works by parsing Burp Suite project files or lists of URLs.
+Pulverize every URL found in the requests and responses of a Burp Suite file to craft target specific wordlists, or find potentially interesting endpoints. At the moment this is an offline only tool that works by parsing Burp Suite project files or lists of URLs.
 
 It can find:
 
@@ -20,39 +20,41 @@ It can find:
 
 ## Usage
 
-To use Pu(r)lverizer, run the script and pass in the appropriate command line arguments. The basic format is as follows:
-
 ```
-python purlverizer.py [options]
+usage: purlverizer.py [-h] (-b  | -u ) [-o] [-e] [-a] [-jk] [-d] [-p] [-v] [-f] [-A] [--in-scope [...]] [--no-numbers [...]] [--every-file] [--nonprintable]
+
+pu(r)lverizer. Take a Burp Suite XML file and find potentially interesting stuff such as URLs or API endpoints; or pulverize every URL found in the requests and responses to craft target specific wordlists. You can also pass a list of URLs to create the wordlists.
+
+options:
+  -h, --help           show this help message and exit
+
+General:
+  These options can be used to specify the input and the output of the script.
+
+  -b , --burp-file     Path to a Burp XML file
+  -u , --urls-list     Path to a list of URLs
+  -o , --output        Path where to save the output file
+
+Actions:
+  Use these options to specify what to do with the provided input. If no action is specified, the script will only print the URLs found in the provided input.
+
+  -e, --endpoints      Search endpoints in a Burp XML file
+  -a, --api            Search API endpoints inside JavaScript files found in Burp XML file
+  -jk, --json-keys     Search JSON keys in a Burp XML file
+  -d, --directories    Get a directories wordlist (both a URLs list and a Burp XML file are accepted)
+  -p, --param-names    Get a parameters names wordlist (both a URLs list and a Burp XML file are accepted)
+  -v, --param-values   Get a parameters values wordlist (both a URLs list and a Burp XML file are accepted)
+  -f, --files          Get a files wordlist (both a URLs list and a Burp XML file are accepted)
+  -A, --all            Find all (execute all the actions with no filters)
+
+Filters:
+  These options can be used to filter the results
+
+  --in-scope [ ...]    Specify one or more in-scope domains (e.g. --in-scope test.com test01.com)
+  --no-numbers [ ...]  Exclude results that contain numbers. Accepted values: directories, files, param_names, param_values
+  --every-file         Include results that contain every kind of file (such as jpg, png, etc.)
+  --nonprintable       Include results that contain nonprintable characters
 ```
-
-Here are the available options:
-
-### General Options
-
--   `-b`, `--burp-file`: Path to a Burp XML file
--   `-u`, `--urls-list`: Path to a list of URLs
--   `-o`, `--output`: Path where to save the output file
-
-### Action Options
-
--   `-e`, `--endpoints`: Search endpoints in a Burp XML file
--   `-a`, `--api`: Search API endpoints inside JavaScript files found in Burp XML file
--   `-jk`, `--json-keys`: Search JSON keys in a Burp XML file
--   `-d`, `--directories`: Get a directories wordlist (both a URLs list and a Burp XML file are accepted)
--   `-p`, `--param-names`: Get a parameters names wordlist (both a URLs list and a Burp XML file are accepted)
--   `-v`, `--param-values`: Get a parameters values wordlist (both a URLs list and a Burp XML file are accepted)
--   `-f`, `--files`: Get a files wordlist (both a URLs list and a Burp XML file are accepted)
--   `-A`, `--all`: Find all (execute all the actions with no filters)
-
-### Filter Options
-
--   `--in-scope`: Specify one or more in-scope domains (e.g. --in-scope test.com test01.com)
--   `--no-numbers`: Exclude results that contain numbers. Accepted values: directories, files, param\_names, param\_values
--   `--every-file`: Include results that contain every kind of file (such as jpg, png, etc.)
--   `--nonprintable`: Include results that contain nonprintable characters
-
-For a detailed description of each option, run the script with the `-h` or `--help` option.
 
 ### Example usage:
 
