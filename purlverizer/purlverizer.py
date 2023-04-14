@@ -721,7 +721,7 @@ def check_file(file_path):
 
 def command_line_parser():
     parser = argparse.ArgumentParser(
-        description="pu(r)lverizer. Take a Burp Suite XML file and find potentially interesting stuff such as URLs or API endpoints; or pulverize every URL found in the requests and responses in order to craft target specific wordlists. You can also pass a list of URLs to create the wordlists.",
+        description="pu(r)lverizer. Take a Burp Suite XML file and find potentially interesting stuff such as URLs or API endpoints; or pulverize every URL found in the requests and responses to craft target specific wordlists. You can also pass a list of URLs to create the wordlists.",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     general_group = parser.add_argument_group(
