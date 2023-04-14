@@ -1,15 +1,5 @@
-test_burp_output
-*.pyc
 launch.json
-.$Untitled Diagram.drawio.bkp
-burp_out_expedia.it_base64
-burp_output_sitemap_complete
-burp_output_small
-burp_output_test
-febino.JPG
-html_test.html
-test.docx
-test_python.py
-Untitled Diagram.drawio
-not_base64_encoded_complete
+*.pyc
 *.txt
+*.drawio
+*.bkp
