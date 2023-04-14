@@ -69,6 +69,120 @@ CONTENT_TYPE_JSON = re.compile(r"Content-Type: application/json")
 TLDS = re.compile(COMMON_TLDS)
 URLS = re.compile(FIND_URLS)
 
+# Helper functions
+
+
+def get_all_keys(json_obj):
+    """
+    Recursively extract all keys from a nested JSON object
+    """
+    keys = set()
+    if isinstance(json_obj, dict):
+        for key, value in json_obj.items():
+            keys.add(str(key))
+            keys.update(get_all_keys(value))
+    elif isinstance(json_obj, list):
+        for item in json_obj:
+            keys.update(get_all_keys(item))
+    return keys
+
+
+def get_all_values(json_obj):
+    """
+    Recursively extract all values from a nested JSON object and convert them to strings
+    """
+    values = set()
+    if isinstance(json_obj, dict):
+        for key, value in json_obj.items():
+            if isinstance(value, (dict, list)):
+                values.update(get_all_values(value))
+            else:
+                values.add(str(value))
+    elif isinstance(json_obj, list):
+        for item in json_obj:
+            if isinstance(item, (dict, list)):
+                values.update(get_all_values(item))
+            else:
+                values.add(str(item))
+    return values
+
+
+def filter_urls_by_domains(urls, domains):
+    """
+    Filters a list of URLs by a list of domains.
+
+    Parameters:
+        urls (list of str): The list of URLs to filter.
+        domains (list of str): The list of domains to filter by.
+
+    Returns:
+        list of str: A new list containing only the URLs that contain any of the specified domains.
+    """
+    if len(domains) == 0:
+        return urls
+    return [url for url in urls if any(domain in url for domain in domains)]
+
+
+def get_url_encoded_params(request_body):
+    """
+    Parse the URL-encoded parameters from a request body.
+
+    Args:
+    - request_body (bytes): A bytes object representing the request body in URL-encoded format.
+
+    Returns:
+    - A dictionary containing the extracted parameters and their values.
+    """
+    decoded_body = request_body.decode("utf-8")
+    params = dict(parse_qsl(decoded_body))
+    return params
+
+
+# Filter functions
+
+
+def show_less_files(files_list):
+    """
+    return a list of strings (original wordlist - words that don't contain common extensions)
+
+    parameters:
+        files_list: a list of strings
+
+    return: a list of strings (original wordlist - words that don't contain common extensions)
+    """
+    every_file_list = [f for f in files_list if Path(f).suffix in COMMON_EXTENSIONS]
+    return every_file_list
+
+
+def remove_nonprintable_chars(wordlist):
+    """
+    Return a list of strings (original wordlist - strings with nonprintable characters)
+
+    parameters:
+        wordlist: a list of strings
+    return: a list of strings (original wordlist - strings with nonprintable characters)
+    """
+
+    no_nonprintable_wordlist = [word for word in wordlist if word.isprintable()]
+    return no_nonprintable_wordlist
+
+
+def remove_numbers(wordlist):
+    """
+    Return a list of strings (original wordlist - strings with numbers)
+
+    parameters:
+        wordlist: a list of strings
+    return: a list of strings (original wordlist - strings with numbers)
+    """
+    no_numbers_wordlist = [
+        word for word in wordlist if not bool(re.search(r"\d", word))
+    ]
+    return no_numbers_wordlist
+
+
+# Output functions
+
 
 def write_dict_to_file(my_dict, dir_path):
     """
@@ -152,6 +266,90 @@ def write_result(wordlist, dir_path):
                     f.write(line + "\n")
 
 
+# Action functions
+
+
+def get_all_items(args, source_list):
+    """
+    Get all the items
+    """
+    if args["urls_list"]:
+        items = {
+            "directories": get_directories(source_list),
+            "files": get_files(source_list),
+            "param_names": get_param_names(source_list),
+            "param_values": get_param_values(source_list),
+        }
+    if args["burp_file"]:
+        items = {
+            "directories": get_directories(source_list),
+            "files": get_files(source_list),
+            "param_names": get_param_names_burp(args["burp_file"]),
+            "param_values": get_param_values_burp(args["burp_file"]),
+            "json_keys": get_json_keys(args["burp_file"]),
+            "endpoints": get_endpoints(args["burp_file"])["urls"],
+            "javascript endpoints": get_endpoints(args["burp_file"])[
+                "javascript_files"
+            ],
+            "api_endpoints": find_api_endpoints_in_js(args["burp_file"]),
+        }
+    return items
+
+
+def remove_numbers_from_wordlist(wordlist, no_numbers):
+    """
+    Remove items that contain numbers from the wordlist
+    """
+    for key in no_numbers:
+        if key in wordlist:
+            wordlist[key] = remove_numbers(wordlist[key])
+    return wordlist
+
+
+def remove_nonprintable_chars_from_wordlist(wordlist):
+    """
+    Remove items that contain nonprintable characters from the wordlist
+    """
+    for key, value in wordlist.items():
+        wordlist[key] = remove_nonprintable_chars(value)
+    return wordlist
+
+
+def get_json_keys(burp_file):
+    """Find all the JSON keys inside a Burp Suite XML file"""
+    json_keys = set()
+    try:
+        for event, elem in ET.iterparse(burp_file):
+            if elem.tag == "response" and elem.attrib["base64"] == "true":
+                try:
+                    decoded_text = str(base64.b64decode(elem.text))
+                    decoded_text = html.unescape(decoded_text)
+                    decoded_text = decoded_text.replace("\\", "").replace("u002F", "/")
+                    if CONTENT_TYPE_JSON.search(decoded_text):
+                        # split the response into headers and body
+                        headers, body = decoded_text.split("rnrn", 1)
+                        # Remove any extra characters from the end of the body and load the JSON data
+                        last_brace_index = body.rfind("}")
+                        json_obj_str = body[: last_brace_index + 1]
+                        try:
+                            body = json.loads(json_obj_str)
+                            # Extract all the JSON keys from the body
+                            json_keys.update(get_all_keys(body))
+                        except json.JSONDecodeError as e:
+                            print(f"Error decoding JSON response: {e}")
+                except TypeError:
+                    pass
+            elif elem.tag == "response" and elem.attrib["base64"] == "false":
+                print(
+                    'Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
+                )
+            if elem.tag == "item":
+                elem.clear()
+    except ET.ParseError as err:
+        print(err)
+    return json_keys
+
+
 def find_api_endpoints_in_js(burp_file):
     """
     Return all API endpoints in the JavaScript responses of a Burp Suite project file.
@@ -192,92 +390,6 @@ def find_api_endpoints_in_js(burp_file):
             elem.clear()
 
     return api_found_in_js
-
-
-def get_all_keys(json_obj):
-    """
-    Recursively extract all keys from a nested JSON object
-    """
-    keys = set()
-    if isinstance(json_obj, dict):
-        for key, value in json_obj.items():
-            keys.add(str(key))
-            keys.update(get_all_keys(value))
-    elif isinstance(json_obj, list):
-        for item in json_obj:
-            keys.update(get_all_keys(item))
-    return keys
-
-
-def get_all_values(json_obj):
-    """
-    Recursively extract all values from a nested JSON object and convert them to strings
-    """
-    values = set()
-    if isinstance(json_obj, dict):
-        for key, value in json_obj.items():
-            if isinstance(value, (dict, list)):
-                values.update(get_all_values(value))
-            else:
-                values.add(str(value))
-    elif isinstance(json_obj, list):
-        for item in json_obj:
-            if isinstance(item, (dict, list)):
-                values.update(get_all_values(item))
-            else:
-                values.add(str(item))
-    return values
-
-
-def get_json_keys(burp_file):
-    """Find all the JSON keys inside a Burp Suite XML file"""
-    json_keys = set()
-    try:
-        for event, elem in ET.iterparse(burp_file):
-            if elem.tag == "response" and elem.attrib["base64"] == "true":
-                try:
-                    decoded_text = str(base64.b64decode(elem.text))
-                    decoded_text = html.unescape(decoded_text)
-                    decoded_text = decoded_text.replace("\\", "").replace("u002F", "/")
-                    if CONTENT_TYPE_JSON.search(decoded_text):
-                        # split the response into headers and body
-                        headers, body = decoded_text.split("rnrn", 1)
-                        # Remove any extra characters from the end of the body and load the JSON data
-                        last_brace_index = body.rfind("}")
-                        json_obj_str = body[: last_brace_index + 1]
-                        try:
-                            body = json.loads(json_obj_str)
-                            # Extract all the JSON keys from the body
-                            json_keys.update(get_all_keys(body))
-                        except json.JSONDecodeError as e:
-                            print(f"Error decoding JSON response: {e}")
-                except TypeError:
-                    pass
-            elif elem.tag == "response" and elem.attrib["base64"] == "false":
-                print(
-                    'Looks like the requests and responses are not Base64 encoded. To get more results, make sure to select "Base64-encode requests and responses" when saving the items from Burp Suite Site map.'
-                )
-            if elem.tag == "item":
-                elem.clear()
-    except ET.ParseError as err:
-        print(err)
-    return json_keys
-
-
-def filter_urls_by_domains(urls, domains):
-    """
-    Filters a list of URLs by a list of domains.
-
-    Parameters:
-        urls (list of str): The list of URLs to filter.
-        domains (list of str): The list of domains to filter by.
-
-    Returns:
-        list of str: A new list containing only the URLs that contain any of the specified domains.
-    """
-    if len(domains) == 0:
-        return urls
-    return [url for url in urls if any(domain in url for domain in domains)]
 
 
 def get_endpoints(burp_file, in_scope_domains=[]):
@@ -343,91 +455,90 @@ def get_endpoints(burp_file, in_scope_domains=[]):
     return endpoints_found
 
 
-def show_less_files(files_list):
+def get_param_values_burp(burp_file):
     """
-    return a list of strings (original wordlist - words that don't contain common extensions)
-
-    parameters:
-        files_list: a list of strings
-
-    return: a list of strings (original wordlist - words that don't contain common extensions)
+    Return a list of parameter values found in a Burp Suite XML file.
     """
-    every_file_list = [f for f in files_list if Path(f).suffix in COMMON_EXTENSIONS]
-    return every_file_list
+    tree = ET.iterparse(burp_file, events=("start", "end"))
 
+    all_values = []
 
-def remove_nonprintable_chars(wordlist):
-    """
-    Return a list of strings (original wordlist - strings with nonprintable characters)
+    url_list = []
 
-    parameters:
-        wordlist: a list of strings
-    return: a list of strings (original wordlist - strings with nonprintable characters)
-    """
+    for event, element in tree:
+        if event == "end" and element.tag == "url":
+            url_list.append(element.text)
 
-    no_nonprintable_wordlist = [word for word in wordlist if word.isprintable()]
-    return no_nonprintable_wordlist
+        if event == "end" and element.tag == "item":
+            request_data = base64.b64decode(element.find("request").text)
 
+            request_method = element.find("method").text
+            if request_method == "POST":
+                request_lines = request_data.split(b"\r\n")
 
-def remove_numbers(wordlist):
-    """
-    Return a list of strings (original wordlist - strings with numbers)
+                request_body = None
 
-    parameters:
-        wordlist: a list of strings
-    return: a list of strings (original wordlist - strings with numbers)
-    """
-    no_numbers_wordlist = [
-        word for word in wordlist if not bool(re.search(r"\d", word))
-    ]
-    return no_numbers_wordlist
+                for index, line in enumerate(request_lines):
+                    if not line and index < len(request_lines) - 1:
+                        request_body = request_lines[index + 1]
+                        break
 
+                try:
+                    decoded_body = request_body.decode("utf-8")
+                except UnicodeDecodeError:
+                    continue
 
-def get_directories(url_list):
-    """
-    Return a list of directories from a list of URLs.
-    """
-    directories_list = []
+                first_curly_index = decoded_body.find("{")
+                last_curly_index = decoded_body.rfind("}")
+                first_square_index = decoded_body.find("[")
+                last_square_index = decoded_body.rfind("]")
 
-    for url in url_list:
-        words = urlparse(url).path.split("/")
-        for word in words:
-            # Don't know if I want to unquote or not. To unquote, uncomment the line below.
-            # word = unquote(word)
-            if word not in directories_list and word != "" and "." not in word:
-                directories_list.append(word)
-    directories_list.sort()
-    return directories_list
+                json_data = None
 
+                if first_curly_index != -1 and last_curly_index != -1:
+                    json_obj_str = decoded_body[
+                        first_curly_index : last_curly_index + 1
+                    ]
+                    try:
+                        json_data = json.loads(json_obj_str)
+                    except json.JSONDecodeError:
+                        pass
 
-def get_files(url_list):
-    """
-    Return a list of files from a list of URLs.
-    """
-    files_list = []
-    for url in url_list:
-        # Don't know if I want to unquote or not. To unquote, uncomment the line below.
-        # word = unquote(Path(urlparse(url).path).name)
-        word = Path(urlparse(url).path).name
-        if word not in files_list and word != "" and "." in word:
-            files_list.append(word)
-    files_list.sort()
-    return files_list
+                if (
+                    json_data is None
+                    and first_square_index != -1
+                    and last_square_index != -1
+                ):
+                    json_array_str = decoded_body[
+                        first_square_index : last_square_index + 1
+                    ]
+                    try:
+                        json_data = json.loads(json_array_str)
+                    except json.JSONDecodeError:
+                        pass
 
+                if json_data is not None:
+                    values = get_all_values(json_data)
+                    all_values.extend(values)
+                else:  # Fallback to name=value pairs if JSON was not processed
+                    url_encoded_params = get_url_encoded_params(request_body)
+                    for _, value in url_encoded_params.items():
+                        # try:
+                        #     value = value.decode("utf-8")
+                        # except UnicodeDecodeError:
+                        #     continue
+                        if value not in all_values:
+                            all_values.append(value)
 
-def get_url_encoded_params(request_body):
-    """
-    Parse the URL-encoded parameters from a request body.
+            element.clear()
 
-    Args:
-    - request_body (bytes): A bytes object representing the request body in URL-encoded format.
+    if url_list:
+        param_values_list = get_param_values(url_list)
+        for param_value in param_values_list:
+            if param_value not in all_values:
+                all_values.append(param_value)
 
-    Returns:
-    - A dictionary containing the extracted parameters and their values.
-    """
-    decoded_body = request_body.decode("utf-8")
-    params = dict(parse_qsl(decoded_body))
-    return params
+    return all_values
 
 
 def get_param_names_burp(burp_file):
@@ -521,90 +632,26 @@ def get_param_names_burp(burp_file):
     return all_parameters
 
 
-def get_param_values_burp(burp_file):
+def get_param_values(url_list):
     """
-    Return a list of parameter values found in a Burp Suite XML file.
+    Return a list of parameter values found in a list of URLs.
     """
-    tree = ET.iterparse(burp_file, events=("start", "end"))
-
-    all_values = []
-
-    url_list = []
-
-    for event, element in tree:
-        if event == "end" and element.tag == "url":
-            url_list.append(element.text)
-
-        if event == "end" and element.tag == "item":
-            request_data = base64.b64decode(element.find("request").text)
-
-            request_method = element.find("method").text
-            if request_method == "POST":
-                request_lines = request_data.split(b"\r\n")
-
-                request_body = None
-
-                for index, line in enumerate(request_lines):
-                    if not line and index < len(request_lines) - 1:
-                        request_body = request_lines[index + 1]
-                        break
-
-                try:
-                    decoded_body = request_body.decode("utf-8")
-                except UnicodeDecodeError:
-                    continue
-
-                first_curly_index = decoded_body.find("{")
-                last_curly_index = decoded_body.rfind("}")
-                first_square_index = decoded_body.find("[")
-                last_square_index = decoded_body.rfind("]")
-
-                json_data = None
-
-                if first_curly_index != -1 and last_curly_index != -1:
-                    json_obj_str = decoded_body[
-                        first_curly_index : last_curly_index + 1
-                    ]
-                    try:
-                        json_data = json.loads(json_obj_str)
-                    except json.JSONDecodeError:
-                        pass
-
-                if (
-                    json_data is None
-                    and first_square_index != -1
-                    and last_square_index != -1
-                ):
-                    json_array_str = decoded_body[
-                        first_square_index : last_square_index + 1
-                    ]
-                    try:
-                        json_data = json.loads(json_array_str)
-                    except json.JSONDecodeError:
-                        pass
-
-                if json_data is not None:
-                    values = get_all_values(json_data)
-                    all_values.extend(values)
-                else:  # Fallback to name=value pairs if JSON was not processed
-                    url_encoded_params = get_url_encoded_params(request_body)
-                    for _, value in url_encoded_params.items():
-                        # try:
-                        #     value = value.decode("utf-8")
-                        # except UnicodeDecodeError:
-                        #     continue
-                        if value not in all_values:
-                            all_values.append(value)
-
-            element.clear()
-
-    if url_list:
-        param_values_list = get_param_values(url_list)
-        for param_value in param_values_list:
-            if param_value not in all_values:
-                all_values.append(param_value)
-
-    return all_values
+    param_values_list = []
+    for url in url_list:
+        url = unquote(url)
+        query = urlparse(url).query.replace("=", "&").split("&")
+        if query[0] == "":
+            pass
+        elif len(query) == 2:
+            if query[1] not in param_values_list and query[1] != "":
+                param_values_list.append(query[1])
+        else:
+            query = query[1::2]
+            for param in query:
+                if param not in param_values_list and param != "":
+                    param_values_list.append(param)
+    param_values_list.sort()
+    return param_values_list
 
 
 def get_param_names(url_list):
@@ -628,26 +675,36 @@ def get_param_names(url_list):
     return param_names_list
 
 
-def get_param_values(url_list):
+def get_files(url_list):
     """
-    Return a list of parameter values found in a list of URLs.
+    Return a list of files from a list of URLs.
     """
-    param_values_list = []
+    files_list = []
     for url in url_list:
-        url = unquote(url)
-        query = urlparse(url).query.replace("=", "&").split("&")
-        if query[0] == "":
-            pass
-        elif len(query) == 2:
-            if query[1] not in param_values_list and query[1] != "":
-                param_values_list.append(query[1])
-        else:
-            query = query[1::2]
-            for param in query:
-                if param not in param_values_list and param != "":
-                    param_values_list.append(param)
-    param_values_list.sort()
-    return param_values_list
+        # Don't know if I want to unquote or not. To unquote, uncomment the line below.
+        # word = unquote(Path(urlparse(url).path).name)
+        word = Path(urlparse(url).path).name
+        if word not in files_list and word != "" and "." in word:
+            files_list.append(word)
+    files_list.sort()
+    return files_list
+
+
+def get_directories(url_list):
+    """
+    Return a list of directories from a list of URLs.
+    """
+    directories_list = []
+
+    for url in url_list:
+        words = urlparse(url).path.split("/")
+        for word in words:
+            # Don't know if I want to unquote or not. To unquote, uncomment the line below.
+            # word = unquote(word)
+            if word not in directories_list and word != "" and "." not in word:
+                directories_list.append(word)
+    directories_list.sort()
+    return directories_list
 
 
 def check_file(file_path):
@@ -659,52 +716,7 @@ def check_file(file_path):
     if os.stat(file_path).st_size == 0:
         sys.exit(f"The file is empty: {file_path}")
 
-
-def get_all_items(args, source_list):
-    """
-    Get all the items
-    """
-    if args["urls_list"]:
-        items = {
-            "directories": get_directories(source_list),
-            "files": get_files(source_list),
-            "param_names": get_param_names(source_list),
-            "param_values": get_param_values(source_list),
-        }
-    if args["burp_file"]:
-        items = {
-            "directories": get_directories(source_list),
-            "files": get_files(source_list),
-            "param_names": get_param_names_burp(args["burp_file"]),
-            "param_values": get_param_values_burp(args["burp_file"]),
-            "json_keys": get_json_keys(args["burp_file"]),
-            "endpoints": get_endpoints(args["burp_file"])["urls"],
-            "javascript endpoints": get_endpoints(args["burp_file"])[
-                "javascript_files"
-            ],
-            "api_endpoints": find_api_endpoints_in_js(args["burp_file"]),
-        }
-    return items
-
-
-def remove_numbers_from_wordlist(wordlist, no_numbers):
-    """
-    Remove items that contain numbers from the wordlist
-    """
-    for key in no_numbers:
-        if key in wordlist:
-            wordlist[key] = remove_numbers(wordlist[key])
-    return wordlist
-
-
-def remove_nonprintable_chars_from_wordlist(wordlist):
-    """
-    Remove items that contain nonprintable characters from the wordlist
-    """
-    for key, value in wordlist.items():
-        wordlist[key] = remove_nonprintable_chars(value)
-    return wordlist
-
+# CLI arguments parser
 
 def command_line_parser():
     parser = argparse.ArgumentParser(
@@ -807,6 +819,7 @@ def command_line_parser():
 
     return parser
 
+# Main
 
 def main():
     """
