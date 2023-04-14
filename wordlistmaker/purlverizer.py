@@ -716,7 +716,9 @@ def check_file(file_path):
     if os.stat(file_path).st_size == 0:
         sys.exit(f"The file is empty: {file_path}")
 
+
 # CLI arguments parser
+
 
 def command_line_parser():
     parser = argparse.ArgumentParser(
@@ -819,7 +821,9 @@ def command_line_parser():
 
     return parser
 
+
 # Main
+
 
 def main():
     """
@@ -915,11 +919,9 @@ def main():
 
     if api_endpoints:
         write_dict_to_file(api_endpoints, args["output"])
-        # print_result(api_endpoints)
 
     if any(wordlist.values()):
         write_result(wordlist, args["output"])
-        # print_result(wordlist)
 
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
