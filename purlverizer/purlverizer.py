@@ -407,7 +407,7 @@ def get_endpoints(burp_file, in_scope_domains=[]):
     """
     urls_found = set()
     js_found = set()
-    false_positives = set()
+
 
     try:
         for event, elem in ET.iterparse(burp_file):
@@ -448,8 +448,7 @@ def get_endpoints(burp_file, in_scope_domains=[]):
 
     endpoints_found = {
         "urls": sorted(urls_found),
-        "javascript_files": sorted(js_found),
-        "probably_false_positives": sorted(false_positives),
+        "javascript_files": sorted(js_found)
     }
 
     return endpoints_found
