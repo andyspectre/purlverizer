@@ -823,7 +823,7 @@ def command_line_parser():
         help="Find all (execute all the actions with no filters)",
         action="store_true",
     )
-    actions_group.add_argument("-r", "--regex", help="regex pattern to search in the request body")
+    actions_group.add_argument("-r", "--regex", metavar="", help="Regex pattern to search in the request body")
 
     filters_group = parser.add_argument_group(
         "Filters", "These options can be used to filter the results"
