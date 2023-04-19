@@ -184,19 +184,18 @@ def remove_numbers(wordlist):
 # Output functions
 
 
-def write_dict_to_file(my_dict, dir_path):
+def write_dict_to_file(my_dict, dir_path, filename):
     """
-    Writes a dictionary to a file in the specified directory. Here it has a hardcoded filename, but can be changed to accept a filename as an argument. Inside the file the dictionary keys are used as section headers and the values are written as a list below each header.
+    Writes a dictionary to a file in the specified directory. Each dictionary key is used as the filename, and the values are written as a list to the file.
 
     Arguments:
         my_dict (dict): A dictionary.
-        dir_path (str): The path to the directory where the output file will be created.
+        dir_path (str): The path to the directory where the output files will be created.
+        filename (str): The filename to use for the output file.
     """
     # Check if the user has write permissions to the directory
     if not os.access(dir_path, os.W_OK):
-        print(
-            f"You don't have write permissions to {dir_path}. Please choose a different directory."
-        )
+        print(f"You don't have write permissions to {dir_path}. Please choose a different directory.")
         return
 
     # Create the directory if it doesn't exist
@@ -204,26 +203,20 @@ def write_dict_to_file(my_dict, dir_path):
         os.makedirs(dir_path)
 
     # Set the filename and check for conflicts
-    filename = os.path.join(dir_path, "apis_found.txt")
+    filename = os.path.join(dir_path, filename)
     while os.path.exists(filename):
-        overwrite = input(
-            f"The file {filename} already exists. Enter a new filename or press Enter to overwrite: "
-        )
+        overwrite = input(f"The file {filename} already exists. Enter a new filename or press Enter to overwrite: ")
         if overwrite == "":
             break
-        filename = os.path.join(dir_path, overwrite)
-    print(os.path.dirname(filename))
+        filename = os.path.join(dir_path, f"{overwrite}.txt")
 
-    # Write the dictionary to the file
+    # Write the value to the file
     with open(filename, "w") as f:
         for key, value in my_dict.items():
-            if value:
-                f.write(f"{key}:\n")
-                for item in value:
-                    f.write(f"{item}\n")
-                f.write("\n")
+            f.write(f"{key}:\n")
+            f.write("\n".join(value))
+            f.write("\n\n")
 
-    print(f"Dictionary written to file: {filename}")
 
 
 def write_result(wordlist, dir_path):
@@ -268,6 +261,44 @@ def write_result(wordlist, dir_path):
 
 # Action functions
 
+def get_regex(burp_file, regex_pattern):
+    """
+    Searches for regex in the body of POST requests in a Burp XML file and returns a dictionary with the URLs and matches found.
+    """
+    matches_dict = dict()
+    
+    # Create an iterator for the Burp XML file using iterparse
+    context = ET.iterparse(burp_file, events=("start", "end"))
+    context = iter(context)
+    event, root = next(context)
+
+    # Loop through each <item> element in the Burp XML file
+    for event, element in context:
+        if event == "end" and element.tag == "item":
+            request_url = element.find("url").text
+            request_method = element.find("method").text
+
+            # Check if the request is a POST request
+            if request_method == "POST":
+                # Base64 decode the request data
+                request_data = base64.b64decode(element.find("request").text)
+
+                # Look for the regex pattern in the body of the request
+                request_lines = request_data.split(b"\r\n")
+                matches = []
+                for line in request_lines:
+                    match = re.findall(regex_pattern, line.decode())
+                    if match:
+                        matches.extend(match)
+
+                # Add the matches to the dictionary for the URL
+                if matches:
+                    matches_dict.setdefault(request_url, set()).update(matches)
+
+            # Clear the element from memory to save memory
+            root.clear()
+
+    return matches_dict
 
 def get_all_items(args, source_list):
     """
@@ -792,6 +823,8 @@ def command_line_parser():
         help="Find all (execute all the actions with no filters)",
         action="store_true",
     )
+    actions_group.add_argument("-r", "--regex", help="regex pattern to search in the request body")
+
     filters_group = parser.add_argument_group(
         "Filters", "These options can be used to filter the results"
     )
@@ -839,6 +872,7 @@ def main():
     endpoints = dict()
     api_endpoints = dict()
     url_list = []
+    regex_matches = dict()
 
     parser = command_line_parser()
     args = vars(parser.parse_args())
@@ -856,6 +890,7 @@ def main():
         wordlist.update(endpoints)
         if args["api"]:
             api_endpoints = find_api_endpoints_in_js(args["burp_file"])
+        
     elif args["urls_list"]:
         check_file(args["urls_list"])
         with open((args["urls_list"]), encoding="utf 8") as f:
@@ -900,6 +935,12 @@ def main():
                 )
             else:
                 wordlist["json_keys"] = get_json_keys(args["burp_file"])
+        if args["regex"]:
+            if args["urls_list"]:
+                sys.exit(
+                    "The --json-keys option is only available with the --burp-file option."
+                )
+            regex_matches = get_regex(args["burp_file"], re.compile(args["regex"]))
 
     valid_args = ["directories", "files", "param_names", "param_values"]
     if args["no_numbers"]:
@@ -917,10 +958,15 @@ def main():
         wordlist["files"] = show_less_files(wordlist["files"])
 
     if api_endpoints:
-        write_dict_to_file(api_endpoints, args["output"])
+        write_dict_to_file(api_endpoints, args["output"], "apis_found.txt")
+    
+    if regex_matches:
+        write_dict_to_file(regex_matches, args["output"], "regex_match.txt")
 
     if any(wordlist.values()):
         write_result(wordlist, args["output"])
+    
+    
 
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
