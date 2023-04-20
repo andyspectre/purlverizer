@@ -11,6 +11,7 @@ It can find:
 -   Endpoints
 -   API endpoints
 -   JSON keys
+-   Custom regex
 
 ## Inspirations
 
@@ -21,7 +22,7 @@ It can find:
 ## Usage
 
 ```
-usage: purlverizer.py [-h] (-b  | -u ) [-o] [-e] [-a] [-jk] [-d] [-p] [-v] [-f] [-A] [--in-scope [...]] [--no-numbers [...]] [--every-file] [--nonprintable]
+usage: purlverizer.py [-h] (-b  | -u ) [-o] [-e] [-a] [-jk] [-d] [-p] [-v] [-f] [-A] [-r] [--in-scope [...]] [--no-numbers [...]] [--every-file] [--nonprintable]
 
 pu(r)lverizer. Take a Burp Suite XML file and find potentially interesting stuff such as URLs or API endpoints; or pulverize every URL found in the requests and responses to craft target specific wordlists. You can also pass a list of URLs to create the wordlists.
 
@@ -46,6 +47,7 @@ Actions:
   -v, --param-values   Get a parameters values wordlist (both a URLs list and a Burp XML file are accepted)
   -f, --files          Get a files wordlist (both a URLs list and a Burp XML file are accepted)
   -A, --all            Find all (execute all the actions with no filters)
+  -r , --regex         Regex pattern to search in the request body
 
 Filters:
   These options can be used to filter the results
