@@ -184,6 +184,7 @@ def remove_numbers(wordlist):
 # Output functions
 
 
+
 def write_dict_to_file(my_dict, dir_path, filename):
     """
     Writes a dictionary to a file in the specified directory. Each dictionary key is used as the filename, and the values are written as a list to the file.
@@ -216,6 +217,7 @@ def write_dict_to_file(my_dict, dir_path, filename):
             f.write(f"{key}:\n")
             f.write("\n".join(value))
             f.write("\n\n")
+
 
 
 
@@ -263,10 +265,10 @@ def write_result(wordlist, dir_path):
 
 def get_regex(burp_file, regex_pattern):
     """
-    Searches for regex in the body of POST requests in a Burp XML file and returns a dictionary with the URLs and matches found.
+    Searches for regex in the body of responses in a Burp XML file and returns a dictionary with the URLs and matches found.
     """
     matches_dict = dict()
-    
+
     # Create an iterator for the Burp XML file using iterparse
     context = ET.iterparse(burp_file, events=("start", "end"))
     context = iter(context)
@@ -276,29 +278,40 @@ def get_regex(burp_file, regex_pattern):
     for event, element in context:
         if event == "end" and element.tag == "item":
             request_url = element.find("url").text
-            request_method = element.find("method").text
 
-            # Check if the request is a POST request
-            if request_method == "POST":
-                # Base64 decode the request data
-                request_data = base64.b64decode(element.find("request").text)
+            # Check if the element has a response
+            response_element = element.find("response")
+            if response_element is None:
+                # Clear the element from memory to save memory
+                root.clear()
+                continue
 
-                # Look for the regex pattern in the body of the request
-                request_lines = request_data.split(b"\r\n")
-                matches = []
-                for line in request_lines:
-                    match = re.findall(regex_pattern, line.decode())
-                    if match:
-                        matches.extend(match)
+            # Base64 decode the response data
+            response_data = base64.b64decode(response_element.text)
 
-                # Add the matches to the dictionary for the URL
-                if matches:
-                    matches_dict.setdefault(request_url, set()).update(matches)
+            # Look for the regex pattern in the body of the response
+            response_lines = response_data.split(b"\r\n")
+            matches = []
+            for line in response_lines:
+                try:
+                    line_text = line.decode()
+                except UnicodeDecodeError:
+                    # Skip non-text lines
+                    continue
+                match = re.findall(regex_pattern, line_text)
+                if match:
+                    matches.extend(match)
+
+            # Add the matches to the dictionary for the URL
+            if matches:
+                matches_dict.setdefault(request_url, set()).update(matches)
 
             # Clear the element from memory to save memory
             root.clear()
 
     return matches_dict
+
+
 
 def get_all_items(args, source_list):
     """
