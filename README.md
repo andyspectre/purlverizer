@@ -1,6 +1,6 @@
 # Pu(r)lverizer
 
-Disclaimer: this is totally a not finished tool and as of september 2024 I haven't look at it in a long while. This tool was started just to improve my python skills, understand better how certain things work and have fun. Other tools (also mentioned down below) will most probably work better than this.  
+**Disclaimer**: this is totally a not finished tool and as of september 2024 I haven't look at it in a long while. This tool was started just to improve my python skills, understand better how certain things work and have fun. Other tools (also mentioned down below) will most probably work better than this.  
 
 Pulverize every URL found in the requests and responses of a Burp Suite file to craft target specific wordlists, or find potentially interesting endpoints. At the moment this is an offline only tool that works by parsing Burp Suite project files or lists of URLs.
 
